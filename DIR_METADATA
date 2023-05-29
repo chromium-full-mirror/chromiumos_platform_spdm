@@ -1,0 +1,6 @@
+team_email: "cros-hwsec@google.com"
+os: CHROME_OS
+buganizer {
+  # ChromeOS > Platform > System > Hardware Security > HwSec GSC
+  component_id: 1188654
+}
