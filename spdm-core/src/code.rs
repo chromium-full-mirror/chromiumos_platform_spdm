@@ -1,0 +1,10 @@
+// Copyright 2023 The ChromiumOS Authors
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+pub const SPDM_THIS_VERSION: u8 = 0x13;
+
+#[repr(u8)]
+pub enum ResponseCode {
+    Error = 0x7F,
+}

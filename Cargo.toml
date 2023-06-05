@@ -1,0 +1,25 @@
+[workspace]
+members = ["spdm-core"]
+
+[package]
+name = "spdm"
+version = "0.1.0"
+authors = ["The ChromiumOS Authors"]
+edition = "2021"
+
+[lib]
+name = "spdm"
+crate-type = ["staticlib"]
+
+[dependencies]
+spdm-core = { path = "spdm-core", default-features = false }
+
+[features]
+default = ["std"]
+std = ["spdm-core/std"]
+
+[profile.release]
+strip = true
+opt-level = "z"
+lto = true
+panic = "abort"

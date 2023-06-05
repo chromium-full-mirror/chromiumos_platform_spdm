@@ -1,0 +1,14 @@
+[package]
+name = "spdm-core"
+version = "0.1.0"
+authors = ["The ChromiumOS Authors"]
+edition = "2021"
+
+[lib]
+name = "spdm_core"
+
+[dependencies]
+
+[features]
+default = ["std"]
+std = []
