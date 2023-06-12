@@ -5,8 +5,7 @@
 //! Implements the state machine of the SPDM responder, the main logic of
 //! this library.
 use crate::context::SpdmContext;
-use crate::error::write_error;
-use crate::error::ErrorCode;
+use crate::error::{write_error, ErrorCode};
 
 /// State machine of the SPDM responder. The user of this library should create
 /// an SpdmState and call its `dispatch_request` whenever it receives an SPDM

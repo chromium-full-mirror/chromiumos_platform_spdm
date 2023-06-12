@@ -2,8 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::code::ResponseCode;
-use crate::code::SPDM_THIS_VERSION;
+use crate::code::{ResponseCode, SPDM_THIS_VERSION};
 
 /// The unspecified error response that should be returned when internal errors
 /// occurred. This constant can be useful for the library's user when it can't

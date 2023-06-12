@@ -8,8 +8,7 @@
 mod context;
 
 use context::EalSpdmContext;
-use spdm_core::SpdmState;
-use spdm_core::UNSPECIFIED_ERROR_RESPONSE;
+use spdm_core::{SpdmState, UNSPECIFIED_ERROR_RESPONSE};
 
 #[cfg(not(feature = "std"))]
 #[panic_handler]
