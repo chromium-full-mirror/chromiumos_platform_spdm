@@ -4,6 +4,8 @@
 
 use super::wait_for_key_exchange::WaitForKeyExchangeDispatcher;
 use crate::deps::SpdmDeps;
+use crate::types::code::parse_header;
+use crate::types::error::ErrorCode;
 use crate::Spdm;
 
 /// The SpdmState is an enum that holds the current state. In each state the
@@ -39,10 +41,23 @@ impl<D: SpdmDeps> SpdmInternalDispatcher for Spdm<D> {
     }
 
     fn dispatch_request_internal(&mut self, buf: &mut [u8], req_size: usize) -> usize {
-        match self.state {
-            SpdmState::WaitForKeyExchange => {
-                self.dispatch_request_wait_for_key_exchange(buf, req_size)
+        if buf.len() < req_size {
+            return ErrorCode::Unspecified.write_response(buf);
+        }
+        let req_code = match parse_header(&buf[..req_size]) {
+            Ok(req_code) => req_code,
+            Err(error) => {
+                return error.write_response(buf);
             }
+        };
+        let result = match self.state {
+            SpdmState::WaitForKeyExchange => {
+                self.dispatch_request_wait_for_key_exchange(buf, req_size, req_code)
+            }
+        };
+        match result {
+            Ok(resp_size) => resp_size,
+            Err(err) => err.write_response(buf),
         }
     }
 }

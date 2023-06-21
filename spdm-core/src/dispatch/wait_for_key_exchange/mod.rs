@@ -3,7 +3,8 @@
 // found in the LICENSE file.
 
 use crate::deps::SpdmDeps;
-use crate::types::error::ErrorCode;
+use crate::types::code::RequestCode;
+use crate::types::error::{ErrorCode, SpdmResult};
 use crate::Spdm;
 
 /// WaitForKeyExchangeDispatcher handles the state where the responder hasn't received
@@ -12,16 +13,28 @@ use crate::Spdm;
 ///
 /// This trait is only used for separating impl blocks of `Spdm` struct by functionality.
 pub trait WaitForKeyExchangeDispatcher {
-    fn dispatch_request_wait_for_key_exchange(&mut self, buf: &mut [u8], req_size: usize) -> usize;
+    fn dispatch_request_wait_for_key_exchange(
+        &mut self,
+        buf: &mut [u8],
+        req_size: usize,
+        req_code: RequestCode,
+    ) -> SpdmResult<usize>;
 }
 
 impl<D: SpdmDeps> WaitForKeyExchangeDispatcher for Spdm<D> {
     fn dispatch_request_wait_for_key_exchange(
         &mut self,
-        buf: &mut [u8],
+        _buf: &mut [u8],
         _req_size: usize,
-    ) -> usize {
-        // TODO(b/284404632): Implement WaitForKeyExchangeDispatcher logic.
-        ErrorCode::Unspecified.write_response(buf)
+        req_code: RequestCode,
+    ) -> SpdmResult<usize> {
+        match req_code {
+            RequestCode::GetVersion => {
+                // TODO(b/284404632): Implement GetVersion logic.
+                Err(ErrorCode::Unspecified)
+            }
+            // TODO(b/284404632): Implement GetPubKey and KeyExchange logic.
+            _ => Err(ErrorCode::UnexpectedRequest),
+        }
     }
 }

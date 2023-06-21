@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use open_enum::open_enum;
+
 use super::code::ResponseCode;
 use super::version::SPDM_THIS_VERSION;
 
@@ -11,16 +13,27 @@ use super::version::SPDM_THIS_VERSION;
 /// initialization failed).
 pub const UNSPECIFIED_ERROR_RESPONSE: [u8; 4] = [
     SPDM_THIS_VERSION,
-    ResponseCode::Error as u8,
-    ErrorCode::Unspecified as u8,
+    ResponseCode::Error.0,
+    ErrorCode::Unspecified.0,
     0,
 ];
 
 #[repr(u8)]
+#[open_enum]
 #[derive(Clone, Copy)]
+#[cfg_attr(test, derive(Debug))]
 pub enum ErrorCode {
+    // One or more request fields are invalid.
+    InvalidRequest = 0x01,
+    // Received a (supported) request at an incorrect state.
+    UnexpectedRequest = 0x04,
     // This is used as all kinds of internal errors.
     Unspecified = 0x05,
+    // The RequestResponseCode in the request message is unsupported.
+    UnsupportedRequest = 0x07,
+    // Requested SPDM version is not supported or is a different
+    // version from the selected version.
+    VersionMismatch = 0x41,
 }
 
 impl ErrorCode {
@@ -40,13 +53,16 @@ impl ErrorCode {
             return 0;
         }
         buf[0] = SPDM_THIS_VERSION;
-        buf[1] = ResponseCode::Error as u8;
-        buf[2] = self as u8;
+        buf[1] = ResponseCode::Error.0;
+        buf[2] = self.0;
         // We haven't introduced any errors that need to set the Param2 field.
         buf[3] = 0;
         4
     }
 }
+
+// Helpful `Result` alias that use `ErrorCode` as error type.
+pub type SpdmResult<T> = Result<T, ErrorCode>;
 
 #[cfg(test)]
 mod tests {
@@ -63,7 +79,7 @@ mod tests {
         let mut buf = [0; 10];
         let error = ErrorCode::Unspecified;
         assert_eq!(ErrorCode::Unspecified.write_response(&mut buf), 4);
-        let expected_data = [SPDM_THIS_VERSION, ResponseCode::Error as u8, error as u8, 0];
+        let expected_data = [SPDM_THIS_VERSION, ResponseCode::Error.0, error.0, 0];
         assert_eq!(buf[0..4], expected_data[..]);
     }
 }

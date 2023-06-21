@@ -8,6 +8,7 @@ edition = "2021"
 name = "spdm"
 
 [dependencies]
+open-enum = "0.3.0"
 
 [features]
 default = ["std"]
