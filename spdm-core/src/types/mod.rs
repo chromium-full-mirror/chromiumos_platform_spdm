@@ -4,4 +4,5 @@
 
 pub mod code;
 pub mod error;
+pub mod message;
 pub mod version;

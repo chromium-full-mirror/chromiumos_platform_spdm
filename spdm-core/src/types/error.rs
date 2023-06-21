@@ -31,6 +31,9 @@ pub enum ErrorCode {
     Unspecified = 0x05,
     // The RequestResponseCode in the request message is unsupported.
     UnsupportedRequest = 0x07,
+    // The response is larger than the writable size of the buffer. Note that
+    // we don't attach the ExtendedErrorData here to keep errors simple.
+    ResponseTooLarge = 0x0D,
     // Requested SPDM version is not supported or is a different
     // version from the selected version.
     VersionMismatch = 0x41,

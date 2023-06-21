@@ -23,6 +23,7 @@ pub enum RequestCode {
 #[derive(Clone, Copy)]
 #[cfg_attr(test, derive(Debug))]
 pub enum ResponseCode {
+    Version = 0x04,
     Error = 0x7F,
 }
 

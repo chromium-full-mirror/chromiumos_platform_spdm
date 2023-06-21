@@ -2,6 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+mod get_version;
+
+use self::get_version::GetVersionDispatcher;
 use crate::deps::SpdmDeps;
 use crate::types::code::RequestCode;
 use crate::types::error::{ErrorCode, SpdmResult};
@@ -24,15 +27,12 @@ pub trait WaitForKeyExchangeDispatcher {
 impl<D: SpdmDeps> WaitForKeyExchangeDispatcher for Spdm<D> {
     fn dispatch_request_wait_for_key_exchange(
         &mut self,
-        _buf: &mut [u8],
-        _req_size: usize,
+        buf: &mut [u8],
+        req_size: usize,
         req_code: RequestCode,
     ) -> SpdmResult<usize> {
         match req_code {
-            RequestCode::GetVersion => {
-                // TODO(b/284404632): Implement GetVersion logic.
-                Err(ErrorCode::Unspecified)
-            }
+            RequestCode::GetVersion => self.dispatch_get_version_request(buf, req_size),
             // TODO(b/284404632): Implement GetPubKey and KeyExchange logic.
             _ => Err(ErrorCode::UnexpectedRequest),
         }

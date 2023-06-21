@@ -7,9 +7,13 @@
 
 mod crypto;
 mod identity;
+#[cfg(test)]
+mod test;
 
 pub use crypto::*;
 pub use identity::*;
+#[cfg(test)]
+pub use test::*;
 
 /// `SpdmDeps` defines the trait dependencies of `Spdm` so it only needs
 /// to be generic on a single type with `SpdmDeps` trait bound.
