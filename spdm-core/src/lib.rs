@@ -10,10 +10,12 @@ mod dispatch;
 pub(crate) mod types;
 
 use deps::SpdmDeps;
+use dispatch::internal::SpdmState;
 pub use dispatch::SpdmDispatcher;
 pub use types::error::UNSPECIFIED_ERROR_RESPONSE;
 
 pub struct Spdm<D: SpdmDeps> {
+    state: SpdmState,
     // LINT: This will be used soon, if we don't put this here now we have to add
     // a phantom data field.
     #[allow(dead_code)]
@@ -22,6 +24,9 @@ pub struct Spdm<D: SpdmDeps> {
 
 impl<D: SpdmDeps> Spdm<D> {
     pub fn new(identity: D::Identity) -> Self {
-        Self { identity }
+        Self {
+            state: SpdmState::default(),
+            identity,
+        }
     }
 }

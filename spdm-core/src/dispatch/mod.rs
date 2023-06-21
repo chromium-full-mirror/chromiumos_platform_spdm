@@ -4,6 +4,10 @@
 
 //! Implements the dispatcher state machine of the SPDM responder.
 
+pub mod internal;
+mod wait_for_key_exchange;
+
+use self::internal::SpdmInternalDispatcher;
 use crate::deps::SpdmDeps;
 use crate::types::error::ErrorCode;
 use crate::Spdm;
@@ -23,8 +27,12 @@ pub trait SpdmDispatcher {
 }
 
 impl<D: SpdmDeps> SpdmDispatcher for Spdm<D> {
-    fn dispatch_request(&mut self, _is_secure: bool, buf: &mut [u8], _req_size: usize) -> usize {
-        // TODO(b/284404632): Implement the whole SPDM dispatcher state machine.
-        ErrorCode::Unspecified.write_response(buf)
+    fn dispatch_request(&mut self, is_secure: bool, buf: &mut [u8], req_size: usize) -> usize {
+        if is_secure {
+            // TODO(b/284404632): Implement secured message decryption/encryption.
+            ErrorCode::Unspecified.write_response(buf)
+        } else {
+            self.dispatch_plaintext_request(buf, req_size)
+        }
     }
 }
