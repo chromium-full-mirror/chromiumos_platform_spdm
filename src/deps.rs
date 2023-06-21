@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use spdm::deps::{Crypto, Identity, SpdmDeps};
+use spdm::deps::{Crypto, Identity, IdentityPublicKey, SpdmDeps};
 
 /// Implements Crypto by interacting with the static eal functions.
 pub struct EalCrypto;
@@ -14,6 +14,10 @@ pub struct EalIdentity;
 
 impl Identity for EalIdentity {
     type Crypto = EalCrypto;
+
+    fn identity_public_key(&self) -> &IdentityPublicKey {
+        unimplemented!()
+    }
 }
 
 pub struct SpdmEalDeps;

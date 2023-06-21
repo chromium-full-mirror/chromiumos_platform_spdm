@@ -22,6 +22,10 @@ pub trait SpdmSessionManager {
     /// Resets the current session.
     fn reset_session(&mut self);
 
+    // Like reset_session, but keep the VCA cache so GetVersion doesn't need to be
+    // sent again.
+    fn reset_session_keep_vca_cache(&mut self);
+
     /// Sets the negotiation transcript of the current session. This is the
     /// concatenation of the GetVersion request and the Version response.
     /// The two parameters are only 4 bytes and 8 bytes each, consume them
@@ -36,6 +40,12 @@ pub trait SpdmSessionManager {
 impl<D: SpdmDeps> SpdmSessionManager for Spdm<D> {
     fn reset_session(&mut self) {
         self.session = Session::default();
+    }
+
+    fn reset_session_keep_vca_cache(&mut self) {
+        let transcript = self.session.transcript;
+        self.session = Session::default();
+        self.session.transcript = transcript;
     }
 
     fn set_negotiation_transcript(

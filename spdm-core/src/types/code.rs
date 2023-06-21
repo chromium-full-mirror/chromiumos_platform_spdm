@@ -16,6 +16,9 @@ const REQUEST_CODE_OFFSET: usize = 1;
 #[cfg_attr(test, derive(Debug))]
 pub enum RequestCode {
     GetVersion = 0x84,
+    // We use a reserved request code as the GetPubKey request code because we
+    // don't want to parse it as a vendor command.
+    GetPubKey = 0xF0,
 }
 
 #[repr(u8)]
@@ -25,10 +28,13 @@ pub enum RequestCode {
 pub enum ResponseCode {
     Version = 0x04,
     Error = 0x7F,
+    // We use a reserved response code as the GetPubKey response code because we
+    // don't want to parse GetPubKey as a vendor command.
+    GetPubKey = 0xF0,
 }
 
 fn is_request_code_supported(code: RequestCode) -> bool {
-    matches!(code, RequestCode::GetVersion)
+    matches!(code, RequestCode::GetVersion | RequestCode::GetPubKey)
 }
 
 pub fn parse_header(req: &[u8]) -> SpdmResult<RequestCode> {
@@ -86,5 +92,11 @@ mod tests {
         // GetVersion request's version should always be 0x10.
         let buf = [0x10, RequestCode::GetVersion.0];
         assert_eq!(parse_header(&buf), Ok(RequestCode::GetVersion));
+    }
+
+    #[test]
+    fn normal_request() {
+        let buf = [SPDM_THIS_VERSION, RequestCode::GetPubKey.0];
+        assert_eq!(parse_header(&buf), Ok(RequestCode::GetPubKey));
     }
 }

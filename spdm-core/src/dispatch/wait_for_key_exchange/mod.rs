@@ -2,8 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+mod get_pub_key;
 mod get_version;
 
+use self::get_pub_key::GetPubKeyDispatcher;
 use self::get_version::GetVersionDispatcher;
 use crate::deps::SpdmDeps;
 use crate::types::code::RequestCode;
@@ -33,7 +35,8 @@ impl<D: SpdmDeps> WaitForKeyExchangeDispatcher for Spdm<D> {
     ) -> SpdmResult<usize> {
         match req_code {
             RequestCode::GetVersion => self.dispatch_get_version_request(buf, req_size),
-            // TODO(b/284404632): Implement GetPubKey and KeyExchange logic.
+            RequestCode::GetPubKey => self.dispatch_get_pub_key_request(buf, req_size),
+            // TODO(b/284404632): Implement KeyExchange logic.
             _ => Err(ErrorCode::UnexpectedRequest),
         }
     }

@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 pub mod code;
+pub mod crypto;
 pub mod error;
 pub mod message;
 pub mod version;

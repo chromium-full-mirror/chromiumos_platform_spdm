@@ -53,7 +53,10 @@ impl<D: SpdmDeps> SpdmInternalDispatcher for Spdm<D> {
             self.reset_session();
             self.state = SpdmState::default();
         }
-        // TODO(b/284404632): If the request is GetPubKey request, reset the state here.
+        if req_code == RequestCode::GetPubKey {
+            self.reset_session_keep_vca_cache();
+            self.state = SpdmState::default();
+        }
         // TODO(b/284404632): If the session is established, block dispatching plaintext request.
         self.dispatch_request_internal(buf, req_size, req_code)
     }
@@ -80,6 +83,8 @@ impl<D: SpdmDeps> SpdmInternalDispatcher for Spdm<D> {
 mod tests {
     use super::*;
     use crate::deps::{SpdmTestDeps, TestIdentity};
+    use crate::types::message::GET_PUBLIC_KEY_RESPONSE_SIZE;
+    use crate::types::version::SPDM_THIS_VERSION;
 
     #[test]
     fn plaintext_get_version_resets_session() {
@@ -96,5 +101,28 @@ mod tests {
         assert_eq!(result, 8, "response: {:?}", &buf[..result]);
         // Transcript should be overwritten.
         assert_ne!(spdm.session.transcript, Some(fake_transcript));
+    }
+
+    #[test]
+    fn plaintext_get_pub_key_keeps_vca() {
+        let mut buf = vec![SPDM_THIS_VERSION, RequestCode::GetPubKey.0, 0, 0];
+        buf.extend_from_slice(&[0; 100]);
+        let req_size = 4;
+
+        let mut spdm = Spdm::<SpdmTestDeps>::new(TestIdentity);
+
+        let fake_transcript = [0xCC; 12];
+        // Simulate the scenario that there's already a transcript.
+        spdm.session.transcript = Some(fake_transcript);
+
+        let result = spdm.dispatch_plaintext_request(&mut buf, req_size);
+        assert_eq!(
+            result,
+            GET_PUBLIC_KEY_RESPONSE_SIZE,
+            "response: {:?}",
+            &buf[..result]
+        );
+        // Transcript should be kept.
+        assert_eq!(spdm.session.transcript, Some(fake_transcript));
     }
 }

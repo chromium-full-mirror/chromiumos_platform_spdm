@@ -18,9 +18,6 @@ pub use types::error::UNSPECIFIED_ERROR_RESPONSE;
 
 pub struct Spdm<D: SpdmDeps> {
     state: SpdmState,
-    // LINT: This will be used soon, if we don't put this here now we have to add
-    // a phantom data field.
-    #[allow(dead_code)]
     identity: D::Identity,
     session: Session,
 }

@@ -3,9 +3,17 @@
 // found in the LICENSE file.
 
 use super::Crypto;
+use crate::types::crypto::EcP256UncompressedPoint;
+
+/// The identity public key is directly put into the GetPubKey response field
+/// without algorithm identifiers, so the format is fixed: a P-256 EC point
+/// in uncompressed format.
+pub type IdentityPublicKey = EcP256UncompressedPoint;
 
 /// Identity trait defines the interface to access the SPDM identity key pair.
 pub trait Identity {
     type Crypto: Crypto;
-    // TODO(b/284404632): Add Identity methods.
+
+    /// Gets the reference of the identity public key.
+    fn identity_public_key(&self) -> &IdentityPublicKey;
 }

@@ -9,6 +9,7 @@ name = "spdm"
 
 [dependencies]
 open-enum = "0.3.0"
+zerocopy = "0.6.1"
 
 [features]
 default = ["std"]
