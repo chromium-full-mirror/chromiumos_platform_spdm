@@ -5,10 +5,10 @@
 //! Implements the SPDM responder logic for FFI users.
 
 #![cfg_attr(not(feature = "std"), no_std)]
-mod context;
+mod deps;
 
-use context::EalSpdmContext;
-use spdm_core::{SpdmState, UNSPECIFIED_ERROR_RESPONSE};
+use deps::{EalIdentity, SpdmEalDeps};
+use spdm::{Spdm, SpdmDispatcher, UNSPECIFIED_ERROR_RESPONSE};
 
 #[cfg(not(feature = "std"))]
 #[panic_handler]
@@ -17,29 +17,19 @@ fn panic(_info: &core::panic::PanicInfo) -> ! {
 }
 
 /// Users of this library can't hold rust types, so the interface is designed
-/// to be purely static. In exchange, the SpdmContext and SpdmState types will
-/// be kept as a global variable. Therefore, the user should only access this
-/// library in the same thread.
-static mut GLOBAL_STATE: Option<GlobalState> = None;
+/// to be purely static. In exchange, SpdmState will be kept as a global variable.
+/// Therefore, the user should only access this library in the same thread.
+static mut SPDM: Option<Spdm<SpdmEalDeps>> = None;
 
-#[repr(C, packed)]
-struct GlobalState {
-    context: EalSpdmContext,
-    state: SpdmState,
-}
-
-fn get_or_create_global_state() -> Option<&'static mut GlobalState> {
-    // SAFETY: GLOBAL_STATE will only be accessed in the same thread.
+fn get_or_create_spdm() -> Option<&'static mut Spdm<SpdmEalDeps>> {
+    // SAFETY: SPDM will only be accessed in the same thread.
     unsafe {
-        if GLOBAL_STATE.is_none() {
-            GLOBAL_STATE = Some(GlobalState {
-                context: EalSpdmContext,
-                state: SpdmState,
-            });
+        if SPDM.is_none() {
+            SPDM = Some(Spdm::<SpdmEalDeps>::new(EalIdentity));
         }
 
-        if GLOBAL_STATE.is_some() {
-            GLOBAL_STATE.as_mut()
+        if SPDM.is_some() {
+            SPDM.as_mut()
         } else {
             None
         }
@@ -51,7 +41,7 @@ fn get_or_create_global_state() -> Option<&'static mut GlobalState> {
 ///
 /// Dispatches the SPDM request to the global SPDM responder state machine.
 ///
-/// `is_secure` should be set to whether the request is secured (clear message if not).
+/// - `is_secure` should be set to whether the request is secured (clear message if not).
 /// - `buf` should contain the SPDM request and the SPDM response will be written back to `buf`.
 /// - `req_size` should contain the size in bytes of the SPDM request.
 /// - `resp_size` should contain the maximum size in bytes we can write to `buf`, and will be
@@ -65,7 +55,7 @@ pub unsafe extern "C" fn dispatch_spdm_request(
 ) {
     let buf = core::slice::from_raw_parts_mut(buf, *resp_size);
 
-    let Some(glob) = get_or_create_global_state() else {
+    let Some(spdm) = get_or_create_spdm() else {
       if *resp_size < UNSPECIFIED_ERROR_RESPONSE.len() {
         // We can't even write the error response. Leave the response empty.
         *resp_size = 0;
@@ -75,7 +65,5 @@ pub unsafe extern "C" fn dispatch_spdm_request(
       *resp_size = UNSPECIFIED_ERROR_RESPONSE.len();
       return;
     };
-    let GlobalState { state, context } = glob;
-
-    *resp_size = state.dispatch_request(context, is_secure, buf, req_size);
+    *resp_size = spdm.dispatch_request(is_secure, buf, req_size);
 }

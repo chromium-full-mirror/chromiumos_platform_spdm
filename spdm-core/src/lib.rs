@@ -5,11 +5,23 @@
 //! Implements the SPDM responder logic.
 
 #![cfg_attr(not(any(feature = "std", test)), no_std)]
-mod code;
-mod context;
-mod error;
-mod state;
+pub mod deps;
+mod dispatch;
+pub(crate) mod types;
 
-pub use context::SpdmContext;
-pub use error::UNSPECIFIED_ERROR_RESPONSE;
-pub use state::SpdmState;
+use deps::SpdmDeps;
+pub use dispatch::SpdmDispatcher;
+pub use types::error::UNSPECIFIED_ERROR_RESPONSE;
+
+pub struct Spdm<D: SpdmDeps> {
+    // LINT: This will be used soon, if we don't put this here now we have to add
+    // a phantom data field.
+    #[allow(dead_code)]
+    identity: D::Identity,
+}
+
+impl<D: SpdmDeps> Spdm<D> {
+    pub fn new(identity: D::Identity) -> Self {
+        Self { identity }
+    }
+}

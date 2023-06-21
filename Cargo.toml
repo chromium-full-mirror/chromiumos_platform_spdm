@@ -2,7 +2,7 @@
 members = ["spdm-core"]
 
 [package]
-name = "spdm"
+name = "spdm-eal"
 version = "0.1.0"
 authors = ["The ChromiumOS Authors"]
 edition = "2021"
@@ -12,11 +12,11 @@ name = "spdm"
 crate-type = ["staticlib"]
 
 [dependencies]
-spdm-core = { path = "spdm-core", default-features = false }
+spdm = { path = "spdm-core", default-features = false }
 
 [features]
 default = ["std"]
-std = ["spdm-core/std"]
+std = ["spdm/std"]
 
 [profile.release]
 strip = true
