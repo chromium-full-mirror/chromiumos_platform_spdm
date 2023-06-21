@@ -66,6 +66,7 @@ impl ErrorCode {
 
 // Helpful `Result` alias that use `ErrorCode` as error type.
 pub type SpdmResult<T> = Result<T, ErrorCode>;
+pub type SpdmStatus = SpdmResult<()>;
 
 #[cfg(test)]
 mod tests {

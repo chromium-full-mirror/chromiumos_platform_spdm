@@ -21,4 +21,8 @@ impl Identity for TestIdentity {
     fn identity_public_key(&self) -> &IdentityPublicKey {
         &TEST_IDENTITY_PUBLIC_KEY
     }
+
+    fn identity_private_key_handle(&self) -> &() {
+        &()
+    }
 }

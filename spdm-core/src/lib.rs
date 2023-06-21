@@ -8,7 +8,7 @@
 pub mod deps;
 mod dispatch;
 mod session;
-pub(crate) mod types;
+pub mod types;
 
 use deps::SpdmDeps;
 use dispatch::internal::SpdmState;
@@ -19,7 +19,7 @@ pub use types::error::UNSPECIFIED_ERROR_RESPONSE;
 pub struct Spdm<D: SpdmDeps> {
     state: SpdmState,
     identity: D::Identity,
-    session: Session,
+    session: Session<D::Crypto>,
 }
 
 impl<D: SpdmDeps> Spdm<D> {
@@ -27,7 +27,7 @@ impl<D: SpdmDeps> Spdm<D> {
         Self {
             state: SpdmState::default(),
             identity,
-            session: Session::default(),
+            session: Session::<D::Crypto>::default(),
         }
     }
 }

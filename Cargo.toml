@@ -13,6 +13,7 @@ crate-type = ["staticlib"]
 
 [dependencies]
 spdm = { path = "spdm-core", default-features = false }
+uninit = { version = "0.5", default-features = false }
 
 [features]
 default = ["std"]
