@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use spdm::deps::{Crypto, CryptoResult, CryptoStatus, Identity, IdentityPublicKey, SpdmDeps};
-use spdm::types::crypto::{EcdsaP256Signature, Sha256Hash};
+use spdm::types::crypto::{EcP256UncompressedPoint, EcdsaP256Signature, Sha256Hash};
 use uninit::prelude::*;
 
 type IdentityPrivateKey = [u8; 32];
@@ -16,6 +16,8 @@ impl Crypto for EalCrypto {
     type IdentityPrivateKeyHandle = IdentityPrivateKey;
     // TODO(b/284404632): Decide some crypto types for eal.
     type Sha256HashContext = ();
+    type HmacDerivationKeyHandle = ();
+    type HmacSecretKeyHandle = ();
 
     fn sha256_init(
         _ctx: Out<Self::Sha256HashContext>,
@@ -46,6 +48,46 @@ impl Crypto for EalCrypto {
         _hash_to_sign: &Sha256Hash,
         _buf: Out<'a, EcdsaP256Signature>,
     ) -> CryptoResult<&'a mut EcdsaP256Signature> {
+        unimplemented!()
+    }
+
+    fn hmac_extract_from_ecdh<'a, 'b>(
+        _their_public_key: &EcP256UncompressedPoint,
+        _salt: &[u8],
+        _my_public_key: Out<'a, EcP256UncompressedPoint>,
+        _hmac_derivation_key_handle: Out<'b, Self::HmacDerivationKeyHandle>,
+    ) -> CryptoResult<(
+        &'a mut EcP256UncompressedPoint,
+        &'b mut Self::HmacDerivationKeyHandle,
+    )> {
+        unimplemented!()
+    }
+
+    fn hmac_expand_hmac_secret_key<'a>(
+        _hmac_derivation_key_handle: &Self::HmacDerivationKeyHandle,
+        _info: &[u8],
+        _hmac_secret_key_handle: Out<'a, Self::HmacSecretKeyHandle>,
+    ) -> CryptoResult<&'a mut Self::HmacSecretKeyHandle> {
+        unimplemented!()
+    }
+
+    fn hmac_expand_derivation_key<'a>(
+        _hmac_derivation_key_handle_in: &Self::HmacDerivationKeyHandle,
+        _info: &[u8],
+        hmac_derivation_key_handle_out: Out<'a, Self::HmacDerivationKeyHandle>,
+    ) -> CryptoResult<&'a mut Self::HmacDerivationKeyHandle> {
+        Ok(hmac_derivation_key_handle_out.write(()))
+    }
+
+    fn hmac<'a>(
+        _hmac_secret_key_handle: &Self::HmacSecretKeyHandle,
+        _data: &[u8],
+        _buf: Out<'a, Sha256Hash>,
+    ) -> CryptoResult<&'a mut Sha256Hash> {
+        unimplemented!()
+    }
+
+    fn random_bytes(_buf: Out<[u8]>) -> CryptoResult<&mut [u8]> {
         unimplemented!()
     }
 }

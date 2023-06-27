@@ -1,0 +1,161 @@
+// Copyright 2023 The ChromiumOS Authors
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+use core::mem::{self, MaybeUninit};
+
+use uninit::prelude::*;
+
+use super::{Session, SessionPhase, SpdmRole};
+use crate::deps::Crypto;
+use crate::types::crypto::{Sha256Hash, SHA256_HASH_SIZE};
+use crate::types::error::{ErrorCode, SpdmResult, SpdmStatus};
+
+const MAX_BIN_CONCAT_SIZE: usize = /* Longest prefix length */ 22 + 32;
+
+const BIN_STR_VERSION: &str = "spdm1.3 ";
+const BIN_STR1_LABEL: &str = "req hs data";
+const BIN_STR2_LABEL: &str = "rsp hs data";
+const BIN_STR7_LABEL: &str = "finished";
+
+/// BinConcatBuffer handles different sizes of the `bin_str[x]` strings defined
+/// in the spec using a fixed-sized buffer. The difference in size of each string
+/// isn't big so this is fine.
+struct BinConcatBuffer {
+    buf: [MaybeUninit<u8>; MAX_BIN_CONCAT_SIZE],
+    size: usize,
+}
+
+impl Default for BinConcatBuffer {
+    fn default() -> Self {
+        Self {
+            buf: uninit_array![u8; MAX_BIN_CONCAT_SIZE],
+            size: 0,
+        }
+    }
+}
+
+impl BinConcatBuffer {
+    fn as_ref(&self) -> &[u8] {
+        // SAFETY: The first `self.size` bytes are initialized.
+        unsafe { mem::transmute(&self.buf[..self.size]) }
+    }
+
+    fn concat(&mut self, data: &[u8]) -> SpdmStatus {
+        if self.size + data.len() > MAX_BIN_CONCAT_SIZE {
+            return Err(ErrorCode::Unspecified);
+        }
+        self.buf[self.size..self.size + data.len()]
+            .as_out()
+            .copy_from_slice(data);
+        self.size += data.len();
+        Ok(())
+    }
+}
+
+/// BinConcat string is the concat of:
+/// - Length: Size of the hash in 2-byte small-endian representation.
+/// - Version: The 8-byte version string ("spdm1.3 " here).
+/// - Label: Variable sized label.
+/// - Context: `Length` size hash, optional.
+fn gen_bin_str(context: Option<&Sha256Hash>, label: &str, buf: &mut BinConcatBuffer) -> SpdmStatus {
+    buf.concat(&(SHA256_HASH_SIZE as u16).to_le_bytes())?;
+    buf.concat(BIN_STR_VERSION.as_bytes())?;
+    buf.concat(label.as_bytes())?;
+    if let Some(ctx) = context {
+        buf.concat(ctx)?;
+    }
+    Ok(())
+}
+
+fn gen_bin_str1(context: &Sha256Hash, buf: &mut BinConcatBuffer) -> SpdmStatus {
+    gen_bin_str(Some(context), BIN_STR1_LABEL, buf)
+}
+
+fn gen_bin_str2(context: &Sha256Hash, buf: &mut BinConcatBuffer) -> SpdmStatus {
+    gen_bin_str(Some(context), BIN_STR2_LABEL, buf)
+}
+
+fn gen_bin_str7(buf: &mut BinConcatBuffer) -> SpdmStatus {
+    gen_bin_str(None, BIN_STR7_LABEL, buf)
+}
+
+pub struct MessageSecrets<C: Crypto> {
+    request_direction: C::HmacDerivationKeyHandle,
+    response_direction: C::HmacDerivationKeyHandle,
+}
+
+impl<C: Crypto> MessageSecrets<C> {
+    fn split_fields_out(
+        out: Out<MessageSecrets<C>>,
+    ) -> (
+        Out<C::HmacDerivationKeyHandle>,
+        Out<C::HmacDerivationKeyHandle>,
+    ) {
+        // SAFETY: The `secret` variable is only used to cast mutable references
+        // of individual fields back to `Out`.
+        let secrets = unsafe { out.assume_init() };
+        (
+            secrets.request_direction.manually_drop_mut().into(),
+            secrets.response_direction.manually_drop_mut().into(),
+        )
+    }
+}
+
+pub fn generate_message_secrets<'a, C: Crypto>(
+    session: &Session<C>,
+    phase: SessionPhase,
+    mut message_secrets: Out<'a, MessageSecrets<C>>,
+) -> SpdmResult<&'a mut MessageSecrets<C>> {
+    let handshake_secret = session
+        .handshake_secret
+        .as_ref()
+        .ok_or(ErrorCode::Unspecified)?;
+    let mut req_bin_str = BinConcatBuffer::default();
+    let mut rsp_bin_str = BinConcatBuffer::default();
+    match phase {
+        SessionPhase::Handshake => {
+            let th = session.th1.as_ref().ok_or(ErrorCode::Unspecified)?;
+            gen_bin_str1(th, &mut req_bin_str)?;
+            gen_bin_str2(th, &mut rsp_bin_str)?;
+        }
+    };
+    let (request_direction, response_direction) =
+        MessageSecrets::split_fields_out(message_secrets.r());
+    C::hmac_expand_derivation_key(handshake_secret, req_bin_str.as_ref(), request_direction)?;
+    C::hmac_expand_derivation_key(handshake_secret, rsp_bin_str.as_ref(), response_direction)?;
+    // SAFETY: both fields are guaranteed to be initialized after successful
+    // `hmac_expand`s.
+    Ok(unsafe { message_secrets.assume_init() })
+}
+
+pub fn generate_finished_key<'a, C: Crypto>(
+    role: SpdmRole,
+    message_secrets: &MessageSecrets<C>,
+    finished_key: Out<'a, C::HmacSecretKeyHandle>,
+) -> SpdmResult<&'a mut C::HmacSecretKeyHandle> {
+    let secret = match role {
+        SpdmRole::Requester => &message_secrets.request_direction,
+        SpdmRole::Responder => &message_secrets.response_direction,
+    };
+    let mut bin_str = BinConcatBuffer::default();
+    gen_bin_str7(&mut bin_str)?;
+    Ok(C::hmac_expand_hmac_secret_key(
+        secret,
+        bin_str.as_ref(),
+        finished_key,
+    )?)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn bin_concat() {
+        let mut bin_str = BinConcatBuffer::default();
+        assert!(bin_str.concat("hello".as_bytes()).is_ok());
+        assert!(bin_str.concat("123".as_bytes()).is_ok());
+        assert_eq!(bin_str.as_ref(), "hello123".as_bytes());
+    }
+}

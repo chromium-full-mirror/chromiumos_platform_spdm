@@ -13,8 +13,8 @@ pub const ECDSA_P256_SCALAR_SIZE: usize = 32;
 
 /// SHA256 hash digest size in bytes.
 pub const SHA256_HASH_SIZE: usize = 32;
-
 pub type Sha256Hash = [u8; SHA256_HASH_SIZE];
+
 pub type EcP256Coord = [u8; EC_P256_COORD_SIZE];
 pub type EcdsaP256Scalar = [u8; ECDSA_P256_SCALAR_SIZE];
 

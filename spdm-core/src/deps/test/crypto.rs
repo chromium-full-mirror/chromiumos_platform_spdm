@@ -2,12 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use core::iter::repeat;
+
 use uninit::prelude::*;
 
 use super::Crypto;
 use crate::deps::{CryptoResult, CryptoStatus};
 use crate::types::crypto::{
-    EcdsaP256Signature, Sha256Hash, ECDSA_P256_SCALAR_SIZE, SHA256_HASH_SIZE,
+    EcP256UncompressedPoint, EcdsaP256Signature, Sha256Hash, ECDSA_P256_SCALAR_SIZE,
+    EC_P256_COORD_SIZE, SHA256_HASH_SIZE,
 };
 
 const TEST_HASH: [u8; SHA256_HASH_SIZE] = [0xFF; SHA256_HASH_SIZE];
@@ -15,12 +18,18 @@ const TEST_SIGNATURE: EcdsaP256Signature = EcdsaP256Signature {
     r: [0x0A; ECDSA_P256_SCALAR_SIZE],
     s: [0x0B; ECDSA_P256_SCALAR_SIZE],
 };
+const TEST_PUBLIC_KEY: EcP256UncompressedPoint = EcP256UncompressedPoint {
+    x: [0x0C; EC_P256_COORD_SIZE],
+    y: [0x0D; EC_P256_COORD_SIZE],
+};
 
 pub struct TestCrypto;
 
 impl Crypto for TestCrypto {
     type IdentityPrivateKeyHandle = ();
     type Sha256HashContext = ();
+    type HmacDerivationKeyHandle = ();
+    type HmacSecretKeyHandle = ();
 
     fn sha256_init(
         ctx: Out<Self::Sha256HashContext>,
@@ -52,5 +61,48 @@ impl Crypto for TestCrypto {
         buf: Out<'a, EcdsaP256Signature>,
     ) -> CryptoResult<&'a mut EcdsaP256Signature> {
         Ok(buf.write(TEST_SIGNATURE))
+    }
+
+    fn hmac_extract_from_ecdh<'a, 'b>(
+        _their_public_key: &EcP256UncompressedPoint,
+        _salt: &[u8],
+        my_public_key: Out<'a, EcP256UncompressedPoint>,
+        hmac_derivation_key_handle: Out<'b, Self::HmacDerivationKeyHandle>,
+    ) -> CryptoResult<(
+        &'a mut EcP256UncompressedPoint,
+        &'b mut Self::HmacDerivationKeyHandle,
+    )> {
+        Ok((
+            my_public_key.write(TEST_PUBLIC_KEY),
+            hmac_derivation_key_handle.write(()),
+        ))
+    }
+
+    fn hmac_expand_hmac_secret_key<'a>(
+        _hmac_derivation_key_handle: &Self::HmacDerivationKeyHandle,
+        _info: &[u8],
+        hmac_secret_key_handle: Out<'a, Self::HmacSecretKeyHandle>,
+    ) -> CryptoResult<&'a mut Self::HmacSecretKeyHandle> {
+        Ok(hmac_secret_key_handle.write(()))
+    }
+
+    fn hmac_expand_derivation_key<'a>(
+        _hmac_derivation_key_handle_in: &Self::HmacDerivationKeyHandle,
+        _info: &[u8],
+        hmac_derivation_key_handle_out: Out<'a, Self::HmacDerivationKeyHandle>,
+    ) -> CryptoResult<&'a mut Self::HmacDerivationKeyHandle> {
+        Ok(hmac_derivation_key_handle_out.write(()))
+    }
+
+    fn hmac<'a>(
+        _hmac_secret_key_handle: &Self::HmacSecretKeyHandle,
+        _data: &[u8],
+        buf: Out<'a, Sha256Hash>,
+    ) -> CryptoResult<&'a mut Sha256Hash> {
+        Ok(buf.write(TEST_HASH))
+    }
+
+    fn random_bytes(buf: Out<[u8]>) -> CryptoResult<&mut [u8]> {
+        Ok(buf.init_with(repeat(0xDD)))
     }
 }
