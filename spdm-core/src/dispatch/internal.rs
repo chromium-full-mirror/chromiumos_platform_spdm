@@ -13,6 +13,7 @@ use crate::Spdm;
 /// dispatcher expects to receive different requests.
 pub enum SpdmState {
     WaitForKeyExchange,
+    WaitForRequesterKey,
 }
 
 impl Default for SpdmState {
@@ -71,6 +72,8 @@ impl<D: SpdmDeps> SpdmInternalDispatcher for Spdm<D> {
             SpdmState::WaitForKeyExchange => {
                 self.dispatch_request_wait_for_key_exchange(buf, req_size, req_code)
             }
+            // TODO(b/284404632): Implement WaitForRequesterKeyDispatcher.
+            SpdmState::WaitForRequesterKey => Err(ErrorCode::Unspecified),
         };
         match result {
             Ok(resp_size) => resp_size,
@@ -94,13 +97,16 @@ mod tests {
         let mut spdm = Spdm::<SpdmTestDeps>::new(TestIdentity);
 
         let fake_transcript = [0xCC; 12];
-        // Simulate the scenario that there's already a transcript.
+        // Simulate the scenario that there's already some state.
         spdm.session.transcript = Some(fake_transcript);
+        spdm.session.session_id = Some([0xAB, 0xCD, 0xEF, 0x89]);
 
         let result = spdm.dispatch_plaintext_request(&mut buf, req_size);
         assert_eq!(result, 8, "response: {:?}", &buf[..result]);
         // Transcript should be overwritten.
         assert_ne!(spdm.session.transcript, Some(fake_transcript));
+        // Session ID should be cleared.
+        assert_eq!(spdm.session.session_id, None);
     }
 
     #[test]
@@ -112,8 +118,9 @@ mod tests {
         let mut spdm = Spdm::<SpdmTestDeps>::new(TestIdentity);
 
         let fake_transcript = [0xCC; 12];
-        // Simulate the scenario that there's already a transcript.
+        // Simulate the scenario that there's already some state.
         spdm.session.transcript = Some(fake_transcript);
+        spdm.session.session_id = Some([0xAB, 0xCD, 0xEF, 0x89]);
 
         let result = spdm.dispatch_plaintext_request(&mut buf, req_size);
         assert_eq!(
@@ -124,5 +131,7 @@ mod tests {
         );
         // Transcript should be kept.
         assert_eq!(spdm.session.transcript, Some(fake_transcript));
+        // Session ID should be cleared.
+        assert_eq!(spdm.session.session_id, None);
     }
 }

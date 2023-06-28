@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use open_enum::open_enum;
+use zerocopy::{AsBytes, FromBytes};
 
 use super::error::{ErrorCode, SpdmResult};
 use super::version::SPDM_THIS_VERSION;
@@ -12,10 +13,11 @@ const REQUEST_CODE_OFFSET: usize = 1;
 
 #[repr(u8)]
 #[open_enum]
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, FromBytes, AsBytes)]
 #[cfg_attr(test, derive(Debug))]
 pub enum RequestCode {
     GetVersion = 0x84,
+    KeyExchange = 0xE4,
     // We use a reserved request code as the GetPubKey request code because we
     // don't want to parse it as a vendor command.
     GetPubKey = 0xF0,
@@ -23,18 +25,27 @@ pub enum RequestCode {
 
 #[repr(u8)]
 #[open_enum]
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, FromBytes, AsBytes)]
 #[cfg_attr(test, derive(Debug))]
 pub enum ResponseCode {
     Version = 0x04,
+    KeyExchange = 0x64,
     Error = 0x7F,
     // We use a reserved response code as the GetPubKey response code because we
     // don't want to parse GetPubKey as a vendor command.
     GetPubKey = 0xF0,
 }
 
+// `Param1` and `Param2` are 1-byte params that appear in most SPDM message formats
+// as the 3rd and 4th bytes.
+pub type Param1 = u8;
+pub type Param2 = u8;
+
 fn is_request_code_supported(code: RequestCode) -> bool {
-    matches!(code, RequestCode::GetVersion | RequestCode::GetPubKey)
+    matches!(
+        code,
+        RequestCode::GetVersion | RequestCode::GetPubKey | RequestCode::KeyExchange
+    )
 }
 
 pub fn parse_header(req: &[u8]) -> SpdmResult<RequestCode> {

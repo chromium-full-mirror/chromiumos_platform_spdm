@@ -4,9 +4,11 @@
 
 mod get_pub_key;
 mod get_version;
+mod key_exchange;
 
 use self::get_pub_key::GetPubKeyDispatcher;
 use self::get_version::GetVersionDispatcher;
+use self::key_exchange::KeyExchangeDispatcher;
 use crate::deps::SpdmDeps;
 use crate::types::code::RequestCode;
 use crate::types::error::{ErrorCode, SpdmResult};
@@ -36,7 +38,7 @@ impl<D: SpdmDeps> WaitForKeyExchangeDispatcher for Spdm<D> {
         match req_code {
             RequestCode::GetVersion => self.dispatch_get_version_request(buf, req_size),
             RequestCode::GetPubKey => self.dispatch_get_pub_key_request(buf, req_size),
-            // TODO(b/284404632): Implement KeyExchange logic.
+            RequestCode::KeyExchange => self.dispatch_key_exchange_request(buf, req_size),
             _ => Err(ErrorCode::UnexpectedRequest),
         }
     }
