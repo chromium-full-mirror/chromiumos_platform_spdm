@@ -9,8 +9,7 @@ mod identity;
 
 pub use crypto::*;
 pub use identity::*;
-
-use super::*;
+use spdm_types::deps::SpdmDeps;
 
 pub struct SpdmTestDeps;
 

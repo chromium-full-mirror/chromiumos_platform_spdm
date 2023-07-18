@@ -8,6 +8,7 @@ edition = "2021"
 name = "spdm"
 
 [dependencies]
+spdm-types = { path = "../spdm-types", default-features = false }
 open-enum = "0.3.0"
 zerocopy = "0.6.1"
 uninit = { version = "0.5", default-features = false }

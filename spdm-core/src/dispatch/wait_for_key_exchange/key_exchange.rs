@@ -4,13 +4,13 @@
 
 use core::mem::MaybeUninit;
 
+use spdm_types::crypto::EcP256UncompressedPoint;
+use spdm_types::deps::{Crypto, SpdmDeps};
 use zerocopy::AsBytes;
 
-use crate::deps::{Crypto, SpdmDeps};
 use crate::dispatch::internal::SpdmState;
 use crate::session::SpdmSessionManager;
 use crate::types::code::ResponseCode;
-use crate::types::crypto::EcP256UncompressedPoint;
 use crate::types::error::{ErrorCode, SpdmResult};
 use crate::types::message::{HalfSessionId, KeyExchangeRequest, KeyExchangeResponse};
 use crate::Spdm;
@@ -112,11 +112,12 @@ impl<D: SpdmDeps> KeyExchangeDispatcher for Spdm<D> {
 
 #[cfg(test)]
 mod tests {
+    use spdm_types::crypto::EC_P256_COORD_SIZE;
+
     use super::*;
     use crate::deps::{SpdmTestDeps, TestIdentity};
     use crate::dispatch::wait_for_key_exchange::get_version::GetVersionDispatcher;
     use crate::types::code::RequestCode;
-    use crate::types::crypto::EC_P256_COORD_SIZE;
     use crate::types::version::SPDM_THIS_VERSION;
 
     fn get_valid_key_exchange_buffer() -> Vec<u8> {

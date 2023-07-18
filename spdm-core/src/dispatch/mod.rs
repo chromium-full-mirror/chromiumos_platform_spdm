@@ -7,8 +7,9 @@
 pub mod internal;
 mod wait_for_key_exchange;
 
+use spdm_types::deps::SpdmDeps;
+
 use self::internal::SpdmInternalDispatcher;
-use crate::deps::SpdmDeps;
 use crate::types::error::ErrorCode;
 use crate::Spdm;
 

@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use spdm::deps::{Crypto, CryptoResult, CryptoStatus, Identity, IdentityPublicKey, SpdmDeps};
-use spdm::types::crypto::{EcP256UncompressedPoint, EcdsaP256Signature, Sha256Hash};
+use spdm_types::crypto::{EcP256UncompressedPoint, EcdsaP256Signature, Sha256Hash};
+use spdm_types::deps::{Crypto, CryptoResult, CryptoStatus, Identity, IdentityPublicKey, SpdmDeps};
 use uninit::prelude::*;
 
 type IdentityPrivateKey = [u8; 32];

@@ -2,22 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-//! Specifies the trait dependencies SPDM needs. Each user of the library
-//! needs to define concret instances of the SPDM dependency traits.
-
-mod crypto;
-mod identity;
 #[cfg(test)]
 mod test;
 
-pub use crypto::*;
-pub use identity::*;
 #[cfg(test)]
 pub use test::*;
-
-/// `SpdmDeps` defines the trait dependencies of `Spdm` so it only needs
-/// to be generic on a single type with `SpdmDeps` trait bound.
-pub trait SpdmDeps {
-    type Crypto: Crypto;
-    type Identity: Identity<Crypto = Self::Crypto>;
-}

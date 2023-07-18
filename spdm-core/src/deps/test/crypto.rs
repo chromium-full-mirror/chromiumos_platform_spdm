@@ -4,14 +4,12 @@
 
 use core::iter::repeat;
 
-use uninit::prelude::*;
-
-use super::Crypto;
-use crate::deps::{CryptoResult, CryptoStatus};
-use crate::types::crypto::{
+use spdm_types::crypto::{
     EcP256UncompressedPoint, EcdsaP256Signature, Sha256Hash, ECDSA_P256_SCALAR_SIZE,
     EC_P256_COORD_SIZE, SHA256_HASH_SIZE,
 };
+use spdm_types::deps::{Crypto, CryptoResult, CryptoStatus};
+use uninit::prelude::*;
 
 const TEST_HASH: [u8; SHA256_HASH_SIZE] = [0xFF; SHA256_HASH_SIZE];
 const TEST_SIGNATURE: EcdsaP256Signature = EcdsaP256Signature {

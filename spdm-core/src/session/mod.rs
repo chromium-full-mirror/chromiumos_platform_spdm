@@ -5,15 +5,15 @@
 mod key_schedule;
 mod sign;
 
+use spdm_types::crypto::{
+    EcP256UncompressedPoint, EcdsaP256Signature, Sha256Hash, SHA256_HASH_SIZE,
+};
+use spdm_types::deps::{Crypto, Identity, SpdmDeps};
 use uninit::prelude::*;
 use zerocopy::AsBytes;
 
 use self::key_schedule::{generate_finished_key, generate_message_secrets, MessageSecrets};
 use self::sign::make_message_to_sign_for_key_exchange;
-use crate::deps::{Crypto, Identity, SpdmDeps};
-use crate::types::crypto::{
-    EcP256UncompressedPoint, EcdsaP256Signature, Sha256Hash, SHA256_HASH_SIZE,
-};
 use crate::types::error::{ErrorCode, SpdmResult, SpdmStatus};
 use crate::types::message::{
     HalfSessionId, SessionId, GET_VERSION_REQUEST_SIZE, VERSION_RESPONSE_SIZE,

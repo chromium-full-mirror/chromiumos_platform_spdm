@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use super::Crypto;
-use crate::types::crypto::EcP256UncompressedPoint;
+use crate::crypto::EcP256UncompressedPoint;
 
 /// The identity public key is directly put into the GetPubKey response field
 /// without algorithm identifiers, so the format is fixed: a P-256 EC point

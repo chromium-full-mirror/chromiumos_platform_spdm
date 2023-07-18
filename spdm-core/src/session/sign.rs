@@ -4,11 +4,11 @@
 
 use core::iter::repeat;
 
+use spdm_types::crypto::Sha256Hash;
+use spdm_types::deps::Crypto;
 use uninit::prelude::*;
 
 use super::SpdmRole;
-use crate::deps::Crypto;
-use crate::types::crypto::Sha256Hash;
 use crate::types::error::{ErrorCode, SpdmResult};
 
 const COMBINED_PREFIX_SIZE: usize = 100;

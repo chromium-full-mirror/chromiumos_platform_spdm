@@ -2,8 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use spdm_types::deps::SpdmDeps;
+
 use super::wait_for_key_exchange::WaitForKeyExchangeDispatcher;
-use crate::deps::SpdmDeps;
 use crate::session::SpdmSessionManager;
 use crate::types::code::{parse_header, RequestCode};
 use crate::types::error::ErrorCode;

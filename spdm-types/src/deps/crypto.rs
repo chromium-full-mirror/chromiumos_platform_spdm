@@ -4,8 +4,7 @@
 
 use uninit::prelude::*;
 
-use crate::types::crypto::{EcP256UncompressedPoint, EcdsaP256Signature, Sha256Hash};
-use crate::types::error::ErrorCode;
+use crate::crypto::{EcP256UncompressedPoint, EcdsaP256Signature, Sha256Hash};
 
 /// In the `Crypto` trait, we only care about success/failure instead of the actual
 /// failure status because SPDM error response doesn't have space to propagate
@@ -15,13 +14,6 @@ use crate::types::error::ErrorCode;
 pub struct CryptoError;
 pub type CryptoResult<T> = Result<T, CryptoError>;
 pub type CryptoStatus = CryptoResult<()>;
-
-impl From<CryptoError> for ErrorCode {
-    /// Always default to Unspecified for `Crypto` errors.
-    fn from(_value: CryptoError) -> Self {
-        ErrorCode::Unspecified
-    }
-}
 
 /// Crypto trait defines the interface of cryptographic functions and types
 /// used in SPDM. Crypto methods should be purely static.

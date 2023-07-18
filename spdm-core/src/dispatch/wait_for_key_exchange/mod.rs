@@ -6,10 +6,11 @@ mod get_pub_key;
 mod get_version;
 mod key_exchange;
 
+use spdm_types::deps::SpdmDeps;
+
 use self::get_pub_key::GetPubKeyDispatcher;
 use self::get_version::GetVersionDispatcher;
 use self::key_exchange::KeyExchangeDispatcher;
-use crate::deps::SpdmDeps;
 use crate::types::code::RequestCode;
 use crate::types::error::{ErrorCode, SpdmResult};
 use crate::Spdm;

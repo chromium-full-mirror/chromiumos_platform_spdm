@@ -2,10 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use spdm_types::crypto::{EcP256UncompressedPoint, EC_P256_COORD_SIZE};
+use spdm_types::deps::{Identity, IdentityPublicKey};
+
 use super::crypto::TestCrypto;
-use super::Identity;
-use crate::deps::IdentityPublicKey;
-use crate::types::crypto::{EcP256UncompressedPoint, EC_P256_COORD_SIZE};
 
 // This is not a real EC point, but that's fine for test.
 pub const TEST_IDENTITY_PUBLIC_KEY: EcP256UncompressedPoint = EcP256UncompressedPoint {

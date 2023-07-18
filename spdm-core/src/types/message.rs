@@ -4,16 +4,16 @@
 
 use core::mem::size_of;
 
-use zerocopy::{AsBytes, FromBytes, LayoutVerified, LittleEndian, Unaligned, U16};
-
-use super::code::{Param1, Param2, RequestCode, ResponseCode};
-use super::crypto::{
+use spdm_types::crypto::{
     EcP256UncompressedPoint, EcdsaP256Signature, Sha256Hash, ECDSA_P256_SIGNATURE_SIZE,
     SHA256_HASH_SIZE,
 };
+use spdm_types::deps::IdentityPublicKey;
+use zerocopy::{AsBytes, FromBytes, LayoutVerified, LittleEndian, Unaligned, U16};
+
+use super::code::{Param1, Param2, RequestCode, ResponseCode};
 use super::error::ErrorCode;
 use super::version::SpdmVersion;
-use crate::deps::IdentityPublicKey;
 
 pub const GET_VERSION_REQUEST_SIZE: usize = 4;
 pub const VERSION_RESPONSE_SIZE: usize = 8;

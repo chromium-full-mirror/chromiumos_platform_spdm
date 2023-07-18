@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use open_enum::open_enum;
+use spdm_types::deps::CryptoError;
 
 use super::code::ResponseCode;
 use super::version::SPDM_THIS_VERSION;
@@ -61,6 +62,13 @@ impl ErrorCode {
         // We haven't introduced any errors that need to set the Param2 field.
         buf[3] = 0;
         4
+    }
+}
+
+impl From<CryptoError> for ErrorCode {
+    /// Always default to Unspecified for `Crypto` errors.
+    fn from(_value: CryptoError) -> Self {
+        ErrorCode::Unspecified
     }
 }
 

@@ -4,11 +4,11 @@
 
 use core::mem::{self, MaybeUninit};
 
+use spdm_types::crypto::{Sha256Hash, SHA256_HASH_SIZE};
+use spdm_types::deps::Crypto;
 use uninit::prelude::*;
 
 use super::{Session, SessionPhase, SpdmRole};
-use crate::deps::Crypto;
-use crate::types::crypto::{Sha256Hash, SHA256_HASH_SIZE};
 use crate::types::error::{ErrorCode, SpdmResult, SpdmStatus};
 
 const MAX_BIN_CONCAT_SIZE: usize = /* Longest prefix length */ 22 + 32;
