@@ -8,17 +8,6 @@ use spdm_types::deps::CryptoError;
 use super::code::ResponseCode;
 use super::version::SPDM_THIS_VERSION;
 
-/// The unspecified error response that should be returned when internal errors
-/// occurred. This constant can be useful for the library's user when it can't
-/// even dispatch a request to the SPDM state machine (e.g., if context/state
-/// initialization failed).
-pub const UNSPECIFIED_ERROR_RESPONSE: [u8; 4] = [
-    SPDM_THIS_VERSION,
-    ResponseCode::Error.0,
-    ErrorCode::Unspecified.0,
-    0,
-];
-
 #[repr(u8)]
 #[open_enum]
 #[derive(Clone, Copy)]

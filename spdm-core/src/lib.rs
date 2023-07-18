@@ -14,7 +14,6 @@ use dispatch::internal::SpdmState;
 pub use dispatch::SpdmDispatcher;
 use session::Session;
 use spdm_types::deps::SpdmDeps;
-pub use types::error::UNSPECIFIED_ERROR_RESPONSE;
 
 pub struct Spdm<D: SpdmDeps> {
     state: SpdmState,
