@@ -19,8 +19,12 @@ pub enum ErrorCode {
     UnexpectedRequest = 0x04,
     // This is used as all kinds of internal errors.
     Unspecified = 0x05,
+    // Cannot decrypt or verify data during the session.
+    DecryptError = 0x06,
     // The RequestResponseCode in the request message is unsupported.
     UnsupportedRequest = 0x07,
+    // The message received is only allowed within a session.
+    SessionRequired = 0x0B,
     // The response is larger than the writable size of the buffer. Note that
     // we don't attach the ExtendedErrorData here to keep errors simple.
     ResponseTooLarge = 0x0D,

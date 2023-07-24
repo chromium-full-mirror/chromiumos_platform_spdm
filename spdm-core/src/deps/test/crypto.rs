@@ -5,8 +5,9 @@
 use core::iter::repeat;
 
 use spdm_types::crypto::{
-    EcP256UncompressedPoint, EcdsaP256Signature, Sha256Hash, ECDSA_P256_SCALAR_SIZE,
-    EC_P256_COORD_SIZE, SHA256_HASH_SIZE,
+    AesGcm128Iv, AesGcm128Tag, EcP256UncompressedPoint, EcdsaP256Signature, Sha256Hash,
+    AES_GCM_128_IV_SIZE, AES_GCM_128_TAG_SIZE, ECDSA_P256_SCALAR_SIZE, EC_P256_COORD_SIZE,
+    SHA256_HASH_SIZE,
 };
 use spdm_types::deps::{Crypto, CryptoResult, CryptoStatus};
 use uninit::prelude::*;
@@ -20,6 +21,8 @@ const TEST_PUBLIC_KEY: EcP256UncompressedPoint = EcP256UncompressedPoint {
     x: [0x0C; EC_P256_COORD_SIZE],
     y: [0x0D; EC_P256_COORD_SIZE],
 };
+const TEST_IV: AesGcm128Iv = [0xAB; AES_GCM_128_IV_SIZE];
+const TEST_TAG: AesGcm128Tag = [0xCD; AES_GCM_128_TAG_SIZE];
 
 pub struct TestCrypto;
 
@@ -28,6 +31,7 @@ impl Crypto for TestCrypto {
     type Sha256HashContext = ();
     type HmacDerivationKeyHandle = ();
     type HmacSecretKeyHandle = ();
+    type AesGcmKeyHandle = ();
 
     fn sha256_init(
         ctx: Out<Self::Sha256HashContext>,
@@ -92,12 +96,48 @@ impl Crypto for TestCrypto {
         Ok(hmac_derivation_key_handle_out.write(()))
     }
 
+    fn hmac_expand_aes_gcm_key<'a>(
+        _hmac_secret_key_handle: &Self::HmacSecretKeyHandle,
+        _info: &[u8],
+        aes_gcm_key: Out<'a, Self::AesGcmKeyHandle>,
+    ) -> CryptoResult<&'a mut Self::AesGcmKeyHandle> {
+        Ok(aes_gcm_key.write(()))
+    }
+
+    fn hmac_expand_aes_gcm_iv<'a>(
+        _hmac_secret_key_handle: &Self::HmacSecretKeyHandle,
+        _info: &[u8],
+        aes_gcm_iv: Out<'a, AesGcm128Iv>,
+    ) -> CryptoResult<&'a mut AesGcm128Iv> {
+        Ok(aes_gcm_iv.write(TEST_IV))
+    }
+
     fn hmac<'a>(
         _hmac_secret_key_handle: &Self::HmacSecretKeyHandle,
         _data: &[u8],
         buf: Out<'a, Sha256Hash>,
     ) -> CryptoResult<&'a mut Sha256Hash> {
         Ok(buf.write(TEST_HASH))
+    }
+
+    fn aes_gcm_encrypt<'a>(
+        _aes_gcm_key_handle: &Self::AesGcmKeyHandle,
+        _iv: &AesGcm128Iv,
+        _aad: &[u8],
+        _buf: &mut [u8],
+        tag: Out<'a, AesGcm128Tag>,
+    ) -> CryptoResult<&'a mut AesGcm128Tag> {
+        Ok(tag.write(TEST_TAG))
+    }
+
+    fn aes_gcm_decrypt(
+        _aes_gcm_key_handle: &Self::AesGcmKeyHandle,
+        _iv: &AesGcm128Iv,
+        _aad: &[u8],
+        _tag: &AesGcm128Tag,
+        _buf: &mut [u8],
+    ) -> CryptoStatus {
+        Ok(())
     }
 
     fn random_bytes(buf: Out<[u8]>) -> CryptoResult<&mut [u8]> {

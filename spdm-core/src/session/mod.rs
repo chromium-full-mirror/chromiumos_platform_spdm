@@ -2,7 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-mod key_schedule;
+pub mod aead;
+pub mod key_schedule;
 mod sign;
 
 use spdm_types::crypto::{
@@ -36,8 +37,9 @@ pub enum SpdmRole {
     Responder,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub enum SessionPhase {
+    None,
     Handshake,
 }
 

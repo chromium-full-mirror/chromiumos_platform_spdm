@@ -4,7 +4,9 @@
 
 use uninit::prelude::*;
 
-use crate::crypto::{EcP256UncompressedPoint, EcdsaP256Signature, Sha256Hash};
+use crate::crypto::{
+    AesGcm128Iv, AesGcm128Tag, EcP256UncompressedPoint, EcdsaP256Signature, Sha256Hash,
+};
 
 /// In the `Crypto` trait, we only care about success/failure instead of the actual
 /// failure status because SPDM error response doesn't have space to propagate
@@ -27,6 +29,8 @@ pub trait Crypto {
     /// This is the key handle for secrets that can be used to perform ordinary
     /// HMACs.
     type HmacSecretKeyHandle;
+    // This is the key handle for the AES-GCM secret key.
+    type AesGcmKeyHandle;
 
     // SHA256 related functions.
     /// Init a SHA256 hash context.
@@ -98,12 +102,44 @@ pub trait Crypto {
         info: &[u8],
         hmac_derivation_key_handle_out: Out<'a, Self::HmacDerivationKeyHandle>,
     ) -> CryptoResult<&'a mut Self::HmacDerivationKeyHandle>;
+    // This expands into an AES-GCM key handle.
+    fn hmac_expand_aes_gcm_key<'a>(
+        hmac_derivation_key_handle: &Self::HmacDerivationKeyHandle,
+        salt: &[u8],
+        aes_gcm_key: Out<'a, Self::AesGcmKeyHandle>,
+    ) -> CryptoResult<&'a mut Self::AesGcmKeyHandle>;
+    // This expands into an AES-GCM IV.
+    fn hmac_expand_aes_gcm_iv<'a>(
+        hmac_derivation_key_handle: &Self::HmacDerivationKeyHandle,
+        salt: &[u8],
+        aes_gcm_iv: Out<'a, AesGcm128Iv>,
+    ) -> CryptoResult<&'a mut AesGcm128Iv>;
     /// Perform HMAC using `hmac_secret_key_handle` as key and `data` as data.
     fn hmac<'a>(
         hmac_secret_key_handle: &Self::HmacSecretKeyHandle,
         data: &[u8],
         buf: Out<'a, Sha256Hash>,
     ) -> CryptoResult<&'a mut Sha256Hash>;
+
+    // AES-GCM related functions. We only use AES-GCM-128 in this SPDM implementation.
+    /// Encrypts the plaintext into ciphertext and tag. The encryption is performed
+    /// in-place, so plaintext and ciphertext share the |buf| buffer.
+    fn aes_gcm_encrypt<'a>(
+        aes_gcm_key_handle: &Self::AesGcmKeyHandle,
+        iv: &AesGcm128Iv,
+        aad: &[u8],
+        buf: &mut [u8],
+        tag: Out<'a, AesGcm128Tag>,
+    ) -> CryptoResult<&'a mut AesGcm128Tag>;
+    /// Decrypts the ciphertext into plaintext while checking the tag. The decryption
+    /// is performed in-place, so plaintext and ciphertext share the |buf| buffer.
+    fn aes_gcm_decrypt(
+        aes_gcm_key_handle: &Self::AesGcmKeyHandle,
+        iv: &AesGcm128Iv,
+        aad: &[u8],
+        tag: &AesGcm128Tag,
+        buf: &mut [u8],
+    ) -> CryptoStatus;
 
     // Misc.
     /// Fill `buf` with random bytes.

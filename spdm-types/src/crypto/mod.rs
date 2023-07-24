@@ -36,3 +36,9 @@ pub struct EcdsaP256Signature {
     pub r: EcdsaP256Scalar,
     pub s: EcdsaP256Scalar,
 }
+
+pub const AES_GCM_128_IV_SIZE: usize = 12;
+pub type AesGcm128Iv = [u8; AES_GCM_128_IV_SIZE];
+
+pub const AES_GCM_128_TAG_SIZE: usize = 16;
+pub type AesGcm128Tag = [u8; AES_GCM_128_TAG_SIZE];

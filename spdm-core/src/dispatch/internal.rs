@@ -2,16 +2,23 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use spdm_types::deps::SpdmDeps;
+use core::mem::MaybeUninit;
+
+use spdm_types::deps::{Crypto, SpdmDeps};
 
 use super::wait_for_key_exchange::WaitForKeyExchangeDispatcher;
-use crate::session::SpdmSessionManager;
+use crate::session::aead::{decrypt_secure_message, encrypt_secure_message, REQUEST_OFFSET};
+use crate::session::key_schedule::{
+    generate_aead_keys, generate_message_secrets, AeadSessionKeys, MessageSecrets,
+};
+use crate::session::{Session, SessionPhase, SpdmSessionManager};
 use crate::types::code::{parse_header, RequestCode};
-use crate::types::error::ErrorCode;
+use crate::types::error::{ErrorCode, SpdmResult};
 use crate::Spdm;
 
 /// The SpdmState is an enum that holds the current state. In each state the
 /// dispatcher expects to receive different requests.
+#[derive(Clone, Copy)]
 pub enum SpdmState {
     WaitForKeyExchange,
     WaitForRequesterKey,
@@ -23,13 +30,25 @@ impl Default for SpdmState {
     }
 }
 
+impl SpdmState {
+    fn phase(self) -> SessionPhase {
+        match self {
+            Self::WaitForKeyExchange => SessionPhase::None,
+            Self::WaitForRequesterKey => SessionPhase::Handshake,
+        }
+    }
+}
+
 /// Defines the methods related to dispatching a request internally, including
 /// dealing with encrypted/plaintext request/response.
 ///
 /// This trait is only used for separating impl blocks of `Spdm` struct by functionality.
 pub trait SpdmInternalDispatcher {
     /// Dispatches a plaintext SPDM request.
-    fn dispatch_plaintext_request(&mut self, buf: &mut [u8], req_size: usize) -> usize;
+    fn dispatch_plaintext_request(&mut self, buf: &mut [u8], req_size: usize) -> SpdmResult<usize>;
+
+    /// Dispatches a secure SPDM request.
+    fn dispatch_secure_request(&mut self, buf: &mut [u8], req_size: usize) -> SpdmResult<usize>;
 
     /// Dispatches a plaintext SPDM request after all preprocessing.
     fn dispatch_request_internal(
@@ -37,20 +56,25 @@ pub trait SpdmInternalDispatcher {
         buf: &mut [u8],
         req_size: usize,
         req_code: RequestCode,
-    ) -> usize;
+    ) -> SpdmResult<usize>;
+}
+
+fn get_session_keys<'a, C: Crypto>(
+    session: &Session<C>,
+    phase: SessionPhase,
+    keys: &'a mut MaybeUninit<AeadSessionKeys<C>>,
+) -> SpdmResult<&'a mut AeadSessionKeys<C>> {
+    let mut message_secrets = MaybeUninit::<MessageSecrets<C>>::uninit();
+    let message_secrets = generate_message_secrets(session, phase, (&mut message_secrets).into())?;
+    generate_aead_keys(message_secrets, keys.into())
 }
 
 impl<D: SpdmDeps> SpdmInternalDispatcher for Spdm<D> {
-    fn dispatch_plaintext_request(&mut self, buf: &mut [u8], req_size: usize) -> usize {
+    fn dispatch_plaintext_request(&mut self, buf: &mut [u8], req_size: usize) -> SpdmResult<usize> {
         if buf.len() < req_size {
-            return ErrorCode::Unspecified.write_response(buf);
+            return Err(ErrorCode::Unspecified);
         }
-        let req_code = match parse_header(&buf[..req_size]) {
-            Ok(req_code) => req_code,
-            Err(error) => {
-                return error.write_response(buf);
-            }
-        };
+        let req_code = parse_header(&buf[..req_size])?;
         if req_code == RequestCode::GetVersion {
             self.reset_session();
             self.state = SpdmState::default();
@@ -59,8 +83,28 @@ impl<D: SpdmDeps> SpdmInternalDispatcher for Spdm<D> {
             self.reset_session_keep_vca_cache();
             self.state = SpdmState::default();
         }
-        // TODO(b/284404632): If the session is established, block dispatching plaintext request.
+        if self.state.phase() != SessionPhase::None {
+            return Err(ErrorCode::SessionRequired);
+        }
         self.dispatch_request_internal(buf, req_size, req_code)
+    }
+
+    fn dispatch_secure_request(&mut self, buf: &mut [u8], req_size: usize) -> SpdmResult<usize> {
+        let phase = self.state.phase();
+        if phase == SessionPhase::None {
+            return Err(ErrorCode::SessionRequired);
+        }
+        let Some(session_id) = self.session.session_id else {
+            return Err(ErrorCode::Unspecified);
+        };
+        let mut session_keys = MaybeUninit::<AeadSessionKeys<D::Crypto>>::uninit();
+        let session_keys = get_session_keys(&self.session, phase, &mut session_keys)?;
+        let req_size =
+            decrypt_secure_message(session_id, &session_keys.request_keys, buf, req_size)?;
+        let req_buf = &mut buf[REQUEST_OFFSET..];
+        let req_code = parse_header(&req_buf[..req_size])?;
+        let resp_size = self.dispatch_request_internal(req_buf, req_size, req_code)?;
+        encrypt_secure_message(session_id, &session_keys.response_keys, buf, resp_size)
     }
 
     fn dispatch_request_internal(
@@ -68,17 +112,13 @@ impl<D: SpdmDeps> SpdmInternalDispatcher for Spdm<D> {
         buf: &mut [u8],
         req_size: usize,
         req_code: RequestCode,
-    ) -> usize {
-        let result = match self.state {
+    ) -> SpdmResult<usize> {
+        match self.state {
             SpdmState::WaitForKeyExchange => {
                 self.dispatch_request_wait_for_key_exchange(buf, req_size, req_code)
             }
             // TODO(b/284404632): Implement WaitForRequesterKeyDispatcher.
             SpdmState::WaitForRequesterKey => Err(ErrorCode::Unspecified),
-        };
-        match result {
-            Ok(resp_size) => resp_size,
-            Err(err) => err.write_response(buf),
         }
     }
 }
@@ -103,7 +143,7 @@ mod tests {
         spdm.session.session_id = Some([0xAB, 0xCD, 0xEF, 0x89]);
 
         let result = spdm.dispatch_plaintext_request(&mut buf, req_size);
-        assert_eq!(result, 8, "response: {:?}", &buf[..result]);
+        assert_eq!(result, Ok(8));
         // Transcript should be overwritten.
         assert_ne!(spdm.session.transcript, Some(fake_transcript));
         // Session ID should be cleared.
@@ -124,15 +164,22 @@ mod tests {
         spdm.session.session_id = Some([0xAB, 0xCD, 0xEF, 0x89]);
 
         let result = spdm.dispatch_plaintext_request(&mut buf, req_size);
-        assert_eq!(
-            result,
-            GET_PUBLIC_KEY_RESPONSE_SIZE,
-            "response: {:?}",
-            &buf[..result]
-        );
+        assert_eq!(result, Ok(GET_PUBLIC_KEY_RESPONSE_SIZE));
         // Transcript should be kept.
         assert_eq!(spdm.session.transcript, Some(fake_transcript));
         // Session ID should be cleared.
         assert_eq!(spdm.session.session_id, None);
+    }
+
+    #[test]
+    fn plaintext_blocked_during_active_session() {
+        let mut buf = vec![SPDM_THIS_VERSION, RequestCode::KeyExchange.0, 0, 0];
+        buf.extend_from_slice(&[0; 100]);
+        let req_size = 4;
+
+        let mut spdm = Spdm::<SpdmTestDeps>::new(TestIdentity);
+        spdm.state = SpdmState::WaitForRequesterKey;
+        let result = spdm.dispatch_plaintext_request(&mut buf, req_size);
+        assert_eq!(result, Err(ErrorCode::SessionRequired));
     }
 }

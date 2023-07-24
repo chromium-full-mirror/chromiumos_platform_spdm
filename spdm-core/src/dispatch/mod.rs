@@ -10,7 +10,6 @@ mod wait_for_key_exchange;
 use spdm_types::deps::SpdmDeps;
 
 use self::internal::SpdmInternalDispatcher;
-use crate::types::error::ErrorCode;
 use crate::Spdm;
 
 /// Defines the methods related to dispatching a request.
@@ -29,11 +28,14 @@ pub trait SpdmDispatcher {
 
 impl<D: SpdmDeps> SpdmDispatcher for Spdm<D> {
     fn dispatch_request(&mut self, is_secure: bool, buf: &mut [u8], req_size: usize) -> usize {
-        if is_secure {
-            // TODO(b/284404632): Implement secured message decryption/encryption.
-            ErrorCode::Unspecified.write_response(buf)
+        let result = if is_secure {
+            self.dispatch_secure_request(buf, req_size)
         } else {
             self.dispatch_plaintext_request(buf, req_size)
+        };
+        match result {
+            Ok(resp_size) => resp_size,
+            Err(err) => err.write_response(buf),
         }
     }
 }

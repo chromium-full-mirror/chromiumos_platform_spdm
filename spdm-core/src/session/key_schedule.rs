@@ -4,7 +4,7 @@
 
 use core::mem::{self, MaybeUninit};
 
-use spdm_types::crypto::{Sha256Hash, SHA256_HASH_SIZE};
+use spdm_types::crypto::{AesGcm128Iv, Sha256Hash, SHA256_HASH_SIZE};
 use spdm_types::deps::Crypto;
 use uninit::prelude::*;
 
@@ -16,6 +16,8 @@ const MAX_BIN_CONCAT_SIZE: usize = /* Longest prefix length */ 22 + 32;
 const BIN_STR_VERSION: &str = "spdm1.3 ";
 const BIN_STR1_LABEL: &str = "req hs data";
 const BIN_STR2_LABEL: &str = "rsp hs data";
+const BIN_STR5_LABEL: &str = "key";
+const BIN_STR6_LABEL: &str = "iv";
 const BIN_STR7_LABEL: &str = "finished";
 
 /// BinConcatBuffer handles different sizes of the `bin_str[x]` strings defined
@@ -76,6 +78,14 @@ fn gen_bin_str2(context: &Sha256Hash, buf: &mut BinConcatBuffer) -> SpdmStatus {
     gen_bin_str(Some(context), BIN_STR2_LABEL, buf)
 }
 
+fn gen_bin_str5(buf: &mut BinConcatBuffer) -> SpdmStatus {
+    gen_bin_str(None, BIN_STR5_LABEL, buf)
+}
+
+fn gen_bin_str6(buf: &mut BinConcatBuffer) -> SpdmStatus {
+    gen_bin_str(None, BIN_STR6_LABEL, buf)
+}
+
 fn gen_bin_str7(buf: &mut BinConcatBuffer) -> SpdmStatus {
     gen_bin_str(None, BIN_STR7_LABEL, buf)
 }
@@ -114,6 +124,7 @@ pub fn generate_message_secrets<'a, C: Crypto>(
     let mut req_bin_str = BinConcatBuffer::default();
     let mut rsp_bin_str = BinConcatBuffer::default();
     match phase {
+        SessionPhase::None => return Err(ErrorCode::Unspecified),
         SessionPhase::Handshake => {
             let th = session.th1.as_ref().ok_or(ErrorCode::Unspecified)?;
             gen_bin_str1(th, &mut req_bin_str)?;
@@ -145,6 +156,68 @@ pub fn generate_finished_key<'a, C: Crypto>(
         bin_str.as_ref(),
         finished_key,
     )?)
+}
+
+pub struct AeadKeys<C: Crypto> {
+    pub key: C::AesGcmKeyHandle,
+    pub iv: AesGcm128Iv,
+}
+
+impl<C: Crypto> AeadKeys<C> {
+    fn split_fields_out(out: Out<AeadKeys<C>>) -> (Out<C::AesGcmKeyHandle>, Out<AesGcm128Iv>) {
+        // SAFETY: The `keys` variable is only used to cast mutable references
+        // of individual fields back to `Out`.
+        let keys = unsafe { out.assume_init() };
+        (
+            keys.key.manually_drop_mut().into(),
+            keys.iv.manually_drop_mut().into(),
+        )
+    }
+}
+
+pub struct AeadSessionKeys<C: Crypto> {
+    pub request_keys: AeadKeys<C>,
+    pub response_keys: AeadKeys<C>,
+}
+
+impl<C: Crypto> AeadSessionKeys<C> {
+    fn split_fields_out(out: Out<AeadSessionKeys<C>>) -> (Out<AeadKeys<C>>, Out<AeadKeys<C>>) {
+        // SAFETY: The `keys` variable is only used to cast mutable references
+        // of individual fields back to `Out`.
+        let keys = unsafe { out.assume_init() };
+        (
+            keys.request_keys.manually_drop_mut().into(),
+            keys.response_keys.manually_drop_mut().into(),
+        )
+    }
+}
+
+pub fn generate_directional_keys<'a, C: Crypto>(
+    secret: &C::HmacDerivationKeyHandle,
+    mut keys: Out<'a, AeadKeys<C>>,
+) -> SpdmResult<&'a mut AeadKeys<C>> {
+    let mut key_bin_str = BinConcatBuffer::default();
+    let mut iv_bin_str = BinConcatBuffer::default();
+    gen_bin_str5(&mut key_bin_str)?;
+    gen_bin_str6(&mut iv_bin_str)?;
+    let (key, iv) = AeadKeys::split_fields_out(keys.r());
+    C::hmac_expand_aes_gcm_key(secret, key_bin_str.as_ref(), key)?;
+    C::hmac_expand_aes_gcm_iv(secret, iv_bin_str.as_ref(), iv)?;
+    // SAFETY: both fields are guaranteed to be initialized after successful
+    // `hmac_expand_*`s.
+    Ok(unsafe { keys.assume_init() })
+}
+
+pub fn generate_aead_keys<'a, C: Crypto>(
+    message_secrets: &MessageSecrets<C>,
+    mut aead_keys: Out<'a, AeadSessionKeys<C>>,
+) -> SpdmResult<&'a mut AeadSessionKeys<C>> {
+    let (request_keys, response_keys) = AeadSessionKeys::split_fields_out(aead_keys.r());
+    generate_directional_keys(&message_secrets.request_direction, request_keys)?;
+    generate_directional_keys(&message_secrets.response_direction, response_keys)?;
+    // SAFETY: both fields are guaranteed to be initialized after successful
+    // `generate_directional_keys`s.
+    Ok(unsafe { aead_keys.assume_init() })
 }
 
 #[cfg(test)]

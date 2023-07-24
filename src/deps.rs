@@ -2,7 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use spdm_types::crypto::{EcP256UncompressedPoint, EcdsaP256Signature, Sha256Hash};
+use spdm_types::crypto::{
+    AesGcm128Iv, AesGcm128Tag, EcP256UncompressedPoint, EcdsaP256Signature, Sha256Hash,
+};
 use spdm_types::deps::{Crypto, CryptoResult, CryptoStatus, Identity, IdentityPublicKey, SpdmDeps};
 use uninit::prelude::*;
 
@@ -18,6 +20,7 @@ impl Crypto for EalCrypto {
     type Sha256HashContext = ();
     type HmacDerivationKeyHandle = ();
     type HmacSecretKeyHandle = ();
+    type AesGcmKeyHandle = ();
 
     fn sha256_init(
         _ctx: Out<Self::Sha256HashContext>,
@@ -79,11 +82,47 @@ impl Crypto for EalCrypto {
         Ok(hmac_derivation_key_handle_out.write(()))
     }
 
+    fn hmac_expand_aes_gcm_key<'a>(
+        _hmac_secret_key_handle: &Self::HmacSecretKeyHandle,
+        _info: &[u8],
+        _aes_gcm_key: Out<'a, Self::AesGcmKeyHandle>,
+    ) -> CryptoResult<&'a mut Self::AesGcmKeyHandle> {
+        unimplemented!()
+    }
+
+    fn hmac_expand_aes_gcm_iv<'a>(
+        _hmac_secret_key_handle: &Self::HmacSecretKeyHandle,
+        _info: &[u8],
+        _aes_gcm_iv: Out<'a, AesGcm128Iv>,
+    ) -> CryptoResult<&'a mut AesGcm128Iv> {
+        unimplemented!()
+    }
+
     fn hmac<'a>(
         _hmac_secret_key_handle: &Self::HmacSecretKeyHandle,
         _data: &[u8],
         _buf: Out<'a, Sha256Hash>,
     ) -> CryptoResult<&'a mut Sha256Hash> {
+        unimplemented!()
+    }
+
+    fn aes_gcm_encrypt<'a>(
+        _aes_gcm_key_handle: &Self::AesGcmKeyHandle,
+        _iv: &AesGcm128Iv,
+        _aad: &[u8],
+        _buf: &mut [u8],
+        _tag: Out<'a, AesGcm128Tag>,
+    ) -> CryptoResult<&'a mut AesGcm128Tag> {
+        unimplemented!()
+    }
+
+    fn aes_gcm_decrypt(
+        _aes_gcm_key_handle: &Self::AesGcmKeyHandle,
+        _iv: &AesGcm128Iv,
+        _aad: &[u8],
+        _tag: &AesGcm128Tag,
+        _buf: &mut [u8],
+    ) -> CryptoStatus {
         unimplemented!()
     }
 
