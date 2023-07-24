@@ -4,6 +4,8 @@
 
 use core::mem::MaybeUninit;
 
+#[cfg(all(test, feature = "mock"))]
+use mocktopus::macros::*;
 use spdm_types::deps::{Crypto, SpdmDeps};
 
 use super::wait_for_key_exchange::WaitForKeyExchangeDispatcher;
@@ -69,6 +71,7 @@ fn get_session_keys<'a, C: Crypto>(
     generate_aead_keys(message_secrets, keys.into())
 }
 
+#[cfg_attr(all(test, feature = "mock"), mockable)]
 impl<D: SpdmDeps> SpdmInternalDispatcher for Spdm<D> {
     fn dispatch_plaintext_request(&mut self, buf: &mut [u8], req_size: usize) -> SpdmResult<usize> {
         if buf.len() < req_size {
@@ -181,5 +184,45 @@ mod tests {
         spdm.state = SpdmState::WaitForRequesterKey;
         let result = spdm.dispatch_plaintext_request(&mut buf, req_size);
         assert_eq!(result, Err(ErrorCode::SessionRequired));
+    }
+
+    #[cfg(feature = "mock")]
+    mod mock {
+        use mocktopus::mocking::{MockContext, MockResult};
+
+        use super::*;
+        use crate::deps::TestCrypto;
+
+        #[test]
+        fn dispatch_secure_request() {
+            let mut buf = vec![0xaa, 0xbb, 0xcc, 0xdd, /*22*/ 0x16, 0x00];
+            let stub_encrypted_req = [0xFF; 6];
+            let original_req = [0x04, 0x00, 0x10, RequestCode::GetVersion.0, 0, 0];
+            buf.extend_from_slice(&stub_encrypted_req);
+            buf.extend_from_slice(&[0xEE; 16]);
+            // Reserve size for response.
+            buf.extend_from_slice(&[0; 100]);
+            let req_size = 28;
+
+            let mut spdm = Spdm::<SpdmTestDeps>::new(TestIdentity);
+            spdm.session.session_id = Some([0xaa, 0xbb, 0xcc, 0xdd]);
+            spdm.session.th1 = Some([0xCC; 32]);
+            spdm.session.handshake_secret = Some(());
+            spdm.state = SpdmState::WaitForRequesterKey;
+            MockContext::new()
+                .mock_safe(TestCrypto::aes_gcm_decrypt, |_, _, _, _, buf| {
+                    assert_eq!(buf, stub_encrypted_req);
+                    buf.copy_from_slice(&original_req);
+                    MockResult::Return(Ok(()))
+                })
+                .mock_safe(
+                    Spdm::<SpdmTestDeps>::dispatch_request_internal,
+                    |_, _, req_size, _| MockResult::Return(Ok(req_size)),
+                )
+                .run(|| {
+                    let result = spdm.dispatch_secure_request(&mut buf, req_size);
+                    assert!(result.is_ok(), "result: {result:?}");
+                })
+        }
     }
 }

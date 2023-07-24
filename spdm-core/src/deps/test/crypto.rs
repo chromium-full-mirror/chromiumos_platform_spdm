@@ -4,6 +4,8 @@
 
 use core::iter::repeat;
 
+#[cfg(feature = "mock")]
+use mocktopus::macros::*;
 use spdm_types::crypto::{
     AesGcm128Iv, AesGcm128Tag, EcP256UncompressedPoint, EcdsaP256Signature, Sha256Hash,
     AES_GCM_128_IV_SIZE, AES_GCM_128_TAG_SIZE, ECDSA_P256_SCALAR_SIZE, EC_P256_COORD_SIZE,
@@ -26,6 +28,7 @@ const TEST_TAG: AesGcm128Tag = [0xCD; AES_GCM_128_TAG_SIZE];
 
 pub struct TestCrypto;
 
+#[cfg_attr(feature = "mock", mockable)]
 impl Crypto for TestCrypto {
     type IdentityPrivateKeyHandle = ();
     type Sha256HashContext = ();
