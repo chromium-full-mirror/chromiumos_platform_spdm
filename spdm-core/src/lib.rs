@@ -4,7 +4,7 @@
 
 //! Implements the SPDM responder logic.
 
-#![cfg_attr(not(any(feature = "std", test)), no_std)]
+#![cfg_attr(not(test), no_std)]
 mod deps;
 mod dispatch;
 mod session;

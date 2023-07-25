@@ -8,7 +8,7 @@ edition = "2021"
 name = "spdm"
 
 [dependencies]
-spdm-types = { path = "../spdm-types", default-features = false }
+spdm-types = { path = "../spdm-types" }
 open-enum = "0.3.0"
 zerocopy = "0.6.1"
 uninit = { version = "0.5", default-features = false }
@@ -17,8 +17,6 @@ uninit = { version = "0.5", default-features = false }
 mocktopus = "0.8.0" # ignored unless use.spdm_unstable_tests by ebuild
 
 [features]
-default = ["std"]
-std = []
 # The mocktopus dependencies are only used when this feature is active because
 # CrOS ebuild doesn't support unstable rust features used by mocktopus by
 # default.
