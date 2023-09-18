@@ -18,6 +18,7 @@ const REQUEST_CODE_OFFSET: usize = 1;
 pub enum RequestCode {
     GetVersion = 0x84,
     KeyExchange = 0xE4,
+    Finish = 0xE5,
     // We use reserved request codes as the Get/GivePubKey request codes because
     // we don't want to parse them as vendor commands.
     GetPubKey = 0xF0,
@@ -31,6 +32,7 @@ pub enum RequestCode {
 pub enum ResponseCode {
     Version = 0x04,
     KeyExchange = 0x64,
+    Finish = 0x65,
     Error = 0x7F,
     // We use reserved response codes as the Get/GivePubKey response code because
     // we don't want to parse them as vendor commands.

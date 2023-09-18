@@ -4,6 +4,7 @@
 
 use uninit::prelude::*;
 
+use super::IdentityPublicKey;
 use crate::crypto::{
     AesGcm128Iv, AesGcm128Tag, EcP256UncompressedPoint, EcdsaP256Signature, Sha256Hash,
 };
@@ -68,6 +69,12 @@ pub trait Crypto {
         hash_to_sign: &Sha256Hash,
         buf: Out<'a, EcdsaP256Signature>,
     ) -> CryptoResult<&'a mut EcdsaP256Signature>;
+    /// Perform ECDSA-P256 verify with the identity public key.
+    fn ecdsa_verify(
+        public_key: &IdentityPublicKey,
+        hash_to_sign: &Sha256Hash,
+        signature: &EcdsaP256Signature,
+    ) -> CryptoStatus;
 
     // HMAC-SHA256 related functions. "SHA256" is stripped from all HMAC function names
     // to keep them short. SHA256 is the only hash algorithm we use in HMAC implementation.
@@ -120,6 +127,12 @@ pub trait Crypto {
         data: &[u8],
         buf: Out<'a, Sha256Hash>,
     ) -> CryptoResult<&'a mut Sha256Hash>;
+    /// Validate `hmac` with `hmac_secret_key_handle` as key and `data` as data.
+    fn validate_hmac(
+        hmac_secret_key_handle: &Self::HmacSecretKeyHandle,
+        data: &[u8],
+        hmac: &Sha256Hash,
+    ) -> CryptoStatus;
 
     // AES-GCM related functions. We only use AES-GCM-128 in this SPDM implementation.
     /// Encrypts the plaintext into ciphertext and tag. The encryption is performed

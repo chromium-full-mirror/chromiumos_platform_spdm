@@ -54,6 +54,14 @@ impl Crypto for EalCrypto {
         unimplemented!()
     }
 
+    fn ecdsa_verify(
+        _public_key: &IdentityPublicKey,
+        _hash_to_sign: &Sha256Hash,
+        _signature: &EcdsaP256Signature,
+    ) -> CryptoStatus {
+        unimplemented!()
+    }
+
     fn hmac_extract_from_ecdh<'a, 'b>(
         _their_public_key: &EcP256UncompressedPoint,
         _salt: &[u8],
@@ -103,6 +111,14 @@ impl Crypto for EalCrypto {
         _data: &[u8],
         _buf: Out<'a, Sha256Hash>,
     ) -> CryptoResult<&'a mut Sha256Hash> {
+        unimplemented!()
+    }
+
+    fn validate_hmac(
+        _hmac_secret_key_handle: &Self::HmacSecretKeyHandle,
+        _data: &[u8],
+        _hmac: &Sha256Hash,
+    ) -> CryptoStatus {
         unimplemented!()
     }
 

@@ -130,6 +130,8 @@ pub fn generate_message_secrets<'a, C: Crypto>(
             gen_bin_str1(th, &mut req_bin_str)?;
             gen_bin_str2(th, &mut rsp_bin_str)?;
         }
+        // TODO(b/284404632): Implement data phase session encryption/decryption.
+        SessionPhase::Data => return Err(ErrorCode::Unspecified),
     };
     let (request_direction, response_direction) =
         MessageSecrets::split_fields_out(message_secrets.r());

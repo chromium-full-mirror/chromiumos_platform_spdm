@@ -121,8 +121,7 @@ pub struct KeyExchangeResponse {
     /// Signature of the transcript hash using the identity key. Refer to the spec
     /// regarding detailed signature algorithm.
     pub signature: EcdsaP256Signature,
-    /// HMAC of the transcript hash TH1 using the established session key. Refer to
-    /// the spec regarding detailed signature algorithm.
+    /// HMAC of the transcript hash TH1 using the established session key.
     pub responder_verify_data: Sha256Hash,
 }
 try_from_mut_u8_arr!(KeyExchangeResponse);
@@ -153,4 +152,28 @@ try_from_u8_arr!(GivePubKeyRequest);
 
 impl GivePubKeyRequest {
     pub const SIZE: usize = size_of::<Self>();
+}
+
+#[repr(C, packed)]
+#[derive(FromBytes, AsBytes, Unaligned)]
+pub struct FinishRequest {
+    pub version: SpdmVersion,
+    pub response_code: ResponseCode,
+    /// Bit 0 indicates whether the signature field is included.
+    /// We ignore this field.
+    pub param1: Param1,
+    /// SlotID. We ignore this field.
+    pub param2: Param2,
+    /// Signature of the transcript hash using the identity key. Refer to the spec
+    /// regarding detailed signature algorithm.
+    pub signature: EcdsaP256Signature,
+    /// HMAC of the transcript hash using the established session key.
+    pub requester_verify_data: Sha256Hash,
+}
+try_from_u8_arr!(FinishRequest);
+
+impl FinishRequest {
+    pub const SIZE: usize = size_of::<Self>();
+    /// The KeyExchangeResponse size without signature and hmac.
+    pub const PARTIAL_SIZE: usize = Self::SIZE - ECDSA_P256_SIGNATURE_SIZE - SHA256_HASH_SIZE;
 }

@@ -23,6 +23,7 @@ const _: () = assert!(REQUESTER_CONTEXT_PREFIX.len() == CONTEXT_PREFIX_SIZE);
 const _: () = assert!(RESPONDER_CONTEXT_PREFIX.len() == CONTEXT_PREFIX_SIZE);
 
 const KEY_EXCHANGE_RESPONSE_SIGNING_CONTEXT: &str = "key_exchange_rsp signing";
+const FINISH_SIGNING_CONTEXT: &str = "finish signing";
 
 fn context_prefix(role: SpdmRole) -> &'static str {
     match role {
@@ -81,6 +82,18 @@ pub fn make_message_to_sign_for_key_exchange<'a, C: Crypto>(
     make_message_to_sign::<C>(
         SpdmRole::Requester,
         KEY_EXCHANGE_RESPONSE_SIGNING_CONTEXT,
+        transcript_hash,
+        buf,
+    )
+}
+
+pub fn make_message_to_sign_for_finish<'a, C: Crypto>(
+    transcript_hash: &Sha256Hash,
+    buf: Out<'a, Sha256Hash>,
+) -> SpdmResult<&'a mut Sha256Hash> {
+    make_message_to_sign::<C>(
+        SpdmRole::Responder,
+        FINISH_SIGNING_CONTEXT,
         transcript_hash,
         buf,
     )

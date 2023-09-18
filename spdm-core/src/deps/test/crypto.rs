@@ -11,7 +11,7 @@ use spdm_types::crypto::{
     AES_GCM_128_IV_SIZE, AES_GCM_128_TAG_SIZE, ECDSA_P256_SCALAR_SIZE, EC_P256_COORD_SIZE,
     SHA256_HASH_SIZE,
 };
-use spdm_types::deps::{Crypto, CryptoResult, CryptoStatus};
+use spdm_types::deps::{Crypto, CryptoResult, CryptoStatus, IdentityPublicKey};
 use uninit::prelude::*;
 
 const TEST_HASH: [u8; SHA256_HASH_SIZE] = [0xFF; SHA256_HASH_SIZE];
@@ -68,6 +68,14 @@ impl Crypto for TestCrypto {
         Ok(buf.write(TEST_SIGNATURE))
     }
 
+    fn ecdsa_verify(
+        _public_key: &IdentityPublicKey,
+        _hash_to_sign: &Sha256Hash,
+        _signature: &EcdsaP256Signature,
+    ) -> CryptoStatus {
+        Ok(())
+    }
+
     fn hmac_extract_from_ecdh<'a, 'b>(
         _their_public_key: &EcP256UncompressedPoint,
         _salt: &[u8],
@@ -121,6 +129,14 @@ impl Crypto for TestCrypto {
         buf: Out<'a, Sha256Hash>,
     ) -> CryptoResult<&'a mut Sha256Hash> {
         Ok(buf.write(TEST_HASH))
+    }
+
+    fn validate_hmac(
+        _hmac_secret_key_handle: &Self::HmacSecretKeyHandle,
+        _data: &[u8],
+        _hmac: &Sha256Hash,
+    ) -> CryptoStatus {
+        unimplemented!()
     }
 
     fn aes_gcm_encrypt<'a>(
