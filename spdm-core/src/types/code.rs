@@ -18,9 +18,10 @@ const REQUEST_CODE_OFFSET: usize = 1;
 pub enum RequestCode {
     GetVersion = 0x84,
     KeyExchange = 0xE4,
-    // We use a reserved request code as the GetPubKey request code because we
-    // don't want to parse it as a vendor command.
+    // We use reserved request codes as the Get/GivePubKey request codes because
+    // we don't want to parse them as vendor commands.
     GetPubKey = 0xF0,
+    GivePubKey = 0xF1,
 }
 
 #[repr(u8)]
@@ -31,9 +32,10 @@ pub enum ResponseCode {
     Version = 0x04,
     KeyExchange = 0x64,
     Error = 0x7F,
-    // We use a reserved response code as the GetPubKey response code because we
-    // don't want to parse GetPubKey as a vendor command.
-    GetPubKey = 0xF0,
+    // We use reserved response codes as the Get/GivePubKey response code because
+    // we don't want to parse them as vendor commands.
+    GetPubKey = 0x10,
+    GivePubKey = 0x11,
 }
 
 // `Param1` and `Param2` are 1-byte params that appear in most SPDM message formats

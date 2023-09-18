@@ -136,3 +136,21 @@ impl KeyExchangeResponse {
     pub const NO_ENCAPSULATE: MutAuthRequested = 1;
     pub const PROVISIONED_SLOT_ID: SlotIdParam = 0xF;
 }
+
+#[repr(C, packed)]
+#[derive(FromBytes, AsBytes, Unaligned)]
+pub struct GivePubKeyRequest {
+    pub version: SpdmVersion,
+    pub request_code: RequestCode,
+    /// Reserved.
+    pub param1: Param1,
+    /// Reserved.
+    pub param2: Param2,
+    /// Requester identity public key.
+    pub public_key: IdentityPublicKey,
+}
+try_from_u8_arr!(GivePubKeyRequest);
+
+impl GivePubKeyRequest {
+    pub const SIZE: usize = size_of::<Self>();
+}

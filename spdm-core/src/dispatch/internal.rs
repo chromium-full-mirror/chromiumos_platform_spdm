@@ -9,6 +9,7 @@ use mocktopus::macros::*;
 use spdm_types::deps::{Crypto, SpdmDeps};
 
 use super::wait_for_key_exchange::WaitForKeyExchangeDispatcher;
+use super::wait_for_requester_key::WaitForRequesterKeyDispatcher;
 use crate::session::aead::{decrypt_secure_message, encrypt_secure_message, REQUEST_OFFSET};
 use crate::session::key_schedule::{
     generate_aead_keys, generate_message_secrets, AeadSessionKeys, MessageSecrets,
@@ -21,9 +22,12 @@ use crate::Spdm;
 /// The SpdmState is an enum that holds the current state. In each state the
 /// dispatcher expects to receive different requests.
 #[derive(Clone, Copy)]
+// LINT: We'll have `SessionEstablished` state soon, with different prefix.
+#[allow(clippy::enum_variant_names)]
 pub enum SpdmState {
     WaitForKeyExchange,
     WaitForRequesterKey,
+    WaitForFinish,
 }
 
 impl Default for SpdmState {
@@ -36,7 +40,7 @@ impl SpdmState {
     fn phase(self) -> SessionPhase {
         match self {
             Self::WaitForKeyExchange => SessionPhase::None,
-            Self::WaitForRequesterKey => SessionPhase::Handshake,
+            Self::WaitForRequesterKey | Self::WaitForFinish => SessionPhase::Handshake,
         }
     }
 }
@@ -120,8 +124,11 @@ impl<D: SpdmDeps> SpdmInternalDispatcher for Spdm<D> {
             SpdmState::WaitForKeyExchange => {
                 self.dispatch_request_wait_for_key_exchange(buf, req_size, req_code)
             }
-            // TODO(b/284404632): Implement WaitForRequesterKeyDispatcher.
-            SpdmState::WaitForRequesterKey => Err(ErrorCode::Unspecified),
+            SpdmState::WaitForRequesterKey => {
+                self.dispatch_request_wait_for_requester_key(buf, req_size, req_code)
+            }
+            // TODO(b/284404632): Implement WaitForFinishDispatcher.
+            SpdmState::WaitForFinish => Err(ErrorCode::Unspecified),
         }
     }
 }

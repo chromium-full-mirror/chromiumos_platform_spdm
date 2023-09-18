@@ -9,7 +9,7 @@ mod sign;
 use spdm_types::crypto::{
     EcP256UncompressedPoint, EcdsaP256Signature, Sha256Hash, SHA256_HASH_SIZE,
 };
-use spdm_types::deps::{Crypto, Identity, SpdmDeps};
+use spdm_types::deps::{Crypto, Identity, IdentityPublicKey, SpdmDeps};
 use uninit::prelude::*;
 use zerocopy::AsBytes;
 
@@ -50,6 +50,7 @@ pub struct Session<C: Crypto> {
     pub th1: Option<TranscriptHash>,
     pub handshake_secret: Option<C::HmacDerivationKeyHandle>,
     pub session_id: Option<SessionId>,
+    pub requester_public_key: Option<IdentityPublicKey>,
 }
 
 impl<C: Crypto> Default for Session<C> {
@@ -60,6 +61,7 @@ impl<C: Crypto> Default for Session<C> {
             th1: None,
             handshake_secret: None,
             session_id: None,
+            requester_public_key: None,
         }
     }
 }
@@ -87,6 +89,9 @@ pub trait SpdmSessionManager {
 
     /// Set the session id.
     fn set_session_id(&mut self, requester_half: HalfSessionId, responder_half: HalfSessionId);
+
+    // Set the requester public key.
+    fn set_requester_public_key(&mut self, public_key: &IdentityPublicKey);
 
     // Perform ECDHE, return the resulting public key, and store the generated derivation key.
     fn generate_handshake_secret<'a>(
@@ -133,6 +138,10 @@ impl<D: SpdmDeps> SpdmSessionManager for Spdm<D> {
         session_id[0..2].copy_from_slice(&requester_half);
         session_id[2..4].copy_from_slice(&responder_half);
         self.session.session_id = Some(session_id);
+    }
+
+    fn set_requester_public_key(&mut self, public_key: &IdentityPublicKey) {
+        self.session.requester_public_key = Some(public_key.clone());
     }
 
     fn generate_handshake_secret<'a>(

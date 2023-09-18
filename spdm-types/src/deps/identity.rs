@@ -18,4 +18,6 @@ pub trait Identity {
     fn identity_public_key(&self) -> &IdentityPublicKey;
     /// Gets the reference of the identity private key handle.
     fn identity_private_key_handle(&self) -> &<Self::Crypto as Crypto>::IdentityPrivateKeyHandle;
+    /// Checks whether |public_key| is a valid identity public key.
+    fn is_public_key_valid(public_key: &IdentityPublicKey) -> bool;
 }

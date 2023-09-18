@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#[cfg(feature = "mock")]
+use mocktopus::macros::*;
 use spdm_types::crypto::{EcP256UncompressedPoint, EC_P256_COORD_SIZE};
 use spdm_types::deps::{Identity, IdentityPublicKey};
 
@@ -15,6 +17,7 @@ pub const TEST_IDENTITY_PUBLIC_KEY: EcP256UncompressedPoint = EcP256Uncompressed
 
 pub struct TestIdentity;
 
+#[cfg_attr(feature = "mock", mockable)]
 impl Identity for TestIdentity {
     type Crypto = TestCrypto;
 
@@ -24,5 +27,9 @@ impl Identity for TestIdentity {
 
     fn identity_private_key_handle(&self) -> &() {
         &()
+    }
+
+    fn is_public_key_valid(_public_key: &EcP256UncompressedPoint) -> bool {
+        true
     }
 }

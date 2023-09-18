@@ -144,6 +144,10 @@ impl Identity for EalIdentity {
     fn identity_private_key_handle(&self) -> &IdentityPrivateKey {
         unimplemented!()
     }
+
+    fn is_public_key_valid(_public_key: &EcP256UncompressedPoint) -> bool {
+        unimplemented!()
+    }
 }
 
 pub struct SpdmEalDeps;

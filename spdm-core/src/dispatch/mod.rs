@@ -6,6 +6,7 @@
 
 pub mod internal;
 mod wait_for_key_exchange;
+mod wait_for_requester_key;
 
 use spdm_types::deps::SpdmDeps;
 
