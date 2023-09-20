@@ -73,7 +73,7 @@ fn get_session_keys<'a, C: Crypto>(
 ) -> SpdmResult<&'a mut AeadSessionKeys<C>> {
     let mut message_secrets = MaybeUninit::<MessageSecrets<C>>::uninit();
     let message_secrets = generate_message_secrets(session, phase, (&mut message_secrets).into())?;
-    generate_aead_keys(message_secrets, keys.into())
+    generate_aead_keys(message_secrets, &session.sequence_numbers, keys.into())
 }
 
 #[cfg_attr(all(test, feature = "mock"), mockable)]
@@ -109,10 +109,14 @@ impl<D: SpdmDeps> SpdmInternalDispatcher for Spdm<D> {
         let session_keys = get_session_keys(&self.session, phase, &mut session_keys)?;
         let req_size =
             decrypt_secure_message(session_id, &session_keys.request_keys, buf, req_size)?;
+        self.session.sequence_numbers.request += 1;
         let req_buf = &mut buf[REQUEST_OFFSET..];
         let req_code = parse_header(&req_buf[..req_size])?;
         let resp_size = self.dispatch_request_internal(req_buf, req_size, req_code)?;
-        encrypt_secure_message(session_id, &session_keys.response_keys, buf, resp_size)
+        let resp_size =
+            encrypt_secure_message(session_id, &session_keys.response_keys, buf, resp_size)?;
+        self.session.sequence_numbers.response += 1;
+        Ok(resp_size)
     }
 
     fn dispatch_request_internal(

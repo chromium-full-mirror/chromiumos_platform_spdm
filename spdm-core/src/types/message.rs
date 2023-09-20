@@ -25,6 +25,8 @@ pub const GET_PUBLIC_KEY_RESPONSE_SIZE: usize = 4 + IdentityPublicKey::SIZE;
 pub type HalfSessionId = [u8; 2];
 pub type SessionId = [u8; 4];
 
+pub type SequenceNumber = u64;
+
 macro_rules! try_from_u8_arr {
     ($Request:ty) => {
         impl<'a> TryFrom<&'a [u8]> for &'a $Request {

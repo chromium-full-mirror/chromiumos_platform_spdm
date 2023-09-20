@@ -19,7 +19,7 @@ use self::key_schedule::{generate_finished_key, generate_message_secrets, Messag
 use self::sign::{make_message_to_sign_for_finish, make_message_to_sign_for_key_exchange};
 use crate::types::error::{ErrorCode, SpdmResult, SpdmStatus};
 use crate::types::message::{
-    HalfSessionId, SessionId, GET_VERSION_REQUEST_SIZE, VERSION_RESPONSE_SIZE,
+    HalfSessionId, SequenceNumber, SessionId, GET_VERSION_REQUEST_SIZE, VERSION_RESPONSE_SIZE,
 };
 use crate::Spdm;
 
@@ -44,6 +44,11 @@ pub enum SessionPhase {
     Data,
 }
 
+pub struct SequenceNumbers {
+    pub request: SequenceNumber,
+    pub response: SequenceNumber,
+}
+
 /// The data constructed/used by session establishment.
 pub struct Session<C: Crypto> {
     pub transcript: Option<NegotiationTranscript>,
@@ -53,6 +58,7 @@ pub struct Session<C: Crypto> {
     pub handshake_secret: Option<C::HmacDerivationKeyHandle>,
     pub session_id: Option<SessionId>,
     pub requester_public_key: Option<IdentityPublicKey>,
+    pub sequence_numbers: SequenceNumbers,
 }
 
 impl<C: Crypto> Default for Session<C> {
@@ -65,6 +71,10 @@ impl<C: Crypto> Default for Session<C> {
             handshake_secret: None,
             session_id: None,
             requester_public_key: None,
+            sequence_numbers: SequenceNumbers {
+                request: 0,
+                response: 0,
+            },
         }
     }
 }

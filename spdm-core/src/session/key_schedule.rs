@@ -8,8 +8,9 @@ use spdm_types::crypto::{AesGcm128Iv, Sha256Hash, SHA256_HASH_SIZE};
 use spdm_types::deps::Crypto;
 use uninit::prelude::*;
 
-use super::{Session, SessionPhase, SpdmRole};
+use super::{SequenceNumbers, Session, SessionPhase, SpdmRole};
 use crate::types::error::{ErrorCode, SpdmResult, SpdmStatus};
+use crate::types::message::SequenceNumber;
 
 const MAX_BIN_CONCAT_SIZE: usize = /* Longest prefix length */ 22 + 32;
 
@@ -210,13 +211,24 @@ pub fn generate_directional_keys<'a, C: Crypto>(
     Ok(unsafe { keys.assume_init() })
 }
 
+fn xor_suffix(iv: &mut AesGcm128Iv, seq_num: SequenceNumber) {
+    let seq_num_bytes = seq_num.to_be_bytes();
+    for i in 4..12 {
+        iv[i] ^= seq_num_bytes[i - 4];
+    }
+}
+
 pub fn generate_aead_keys<'a, C: Crypto>(
     message_secrets: &MessageSecrets<C>,
+    sequence_numbers: &SequenceNumbers,
     mut aead_keys: Out<'a, AeadSessionKeys<C>>,
 ) -> SpdmResult<&'a mut AeadSessionKeys<C>> {
     let (request_keys, response_keys) = AeadSessionKeys::split_fields_out(aead_keys.r());
-    generate_directional_keys(&message_secrets.request_direction, request_keys)?;
-    generate_directional_keys(&message_secrets.response_direction, response_keys)?;
+    let request_keys = generate_directional_keys(&message_secrets.request_direction, request_keys)?;
+    let response_keys =
+        generate_directional_keys(&message_secrets.response_direction, response_keys)?;
+    xor_suffix(&mut request_keys.iv, sequence_numbers.request);
+    xor_suffix(&mut response_keys.iv, sequence_numbers.response);
     // SAFETY: both fields are guaranteed to be initialized after successful
     // `generate_directional_keys`s.
     Ok(unsafe { aead_keys.assume_init() })
@@ -232,5 +244,13 @@ mod tests {
         assert!(bin_str.concat("hello".as_bytes()).is_ok());
         assert!(bin_str.concat("123".as_bytes()).is_ok());
         assert_eq!(bin_str.as_ref(), "hello123".as_bytes());
+    }
+
+    #[test]
+    fn test_xor_suffix() {
+        let mut iv = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+        let seq_num = 18446744073709551615; // (1 << 64) - 1
+        xor_suffix(&mut iv, seq_num);
+        assert_eq!(iv, [1, 2, 3, 4, 250, 249, 248, 247, 246, 245, 244, 243])
     }
 }
