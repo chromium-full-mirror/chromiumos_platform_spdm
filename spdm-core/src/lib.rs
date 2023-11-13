@@ -18,14 +18,16 @@ use spdm_types::deps::SpdmDeps;
 pub struct Spdm<D: SpdmDeps> {
     state: SpdmState,
     identity: D::Identity,
+    vendor: D::Vendor,
     session: Session<D::Crypto>,
 }
 
 impl<D: SpdmDeps> Spdm<D> {
-    pub fn new(identity: D::Identity) -> Self {
+    pub fn new(identity: D::Identity, vendor: D::Vendor) -> Self {
         Self {
             state: SpdmState::default(),
             identity,
+            vendor,
             session: Session::<D::Crypto>::default(),
         }
     }

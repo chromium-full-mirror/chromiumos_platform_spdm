@@ -62,7 +62,7 @@ impl<D: SpdmDeps> GetPubKeyDispatcher for Spdm<D> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::deps::{SpdmTestDeps, TestIdentity, TEST_IDENTITY_PUBLIC_KEY};
+    use crate::deps::{SpdmTestDeps, TestIdentity, TestVendor, TEST_IDENTITY_PUBLIC_KEY};
     use crate::dispatch::internal::SpdmState;
     use crate::types::code::RequestCode;
     use crate::types::version::SPDM_THIS_VERSION;
@@ -73,7 +73,7 @@ mod tests {
         buf.extend_from_slice(&[0; 100]);
         let req_size = 4;
 
-        let mut spdm = Spdm::<SpdmTestDeps>::new(TestIdentity);
+        let mut spdm = Spdm::<SpdmTestDeps>::new(TestIdentity, TestVendor);
 
         let result = spdm.dispatch_get_pub_key_request(&mut buf, req_size);
         assert_eq!(result, Ok(GET_PUBLIC_KEY_RESPONSE_SIZE));

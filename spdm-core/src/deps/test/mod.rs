@@ -6,14 +6,17 @@
 
 mod crypto;
 mod identity;
+mod vendor;
 
 pub use crypto::*;
 pub use identity::*;
 use spdm_types::deps::SpdmDeps;
+pub use vendor::*;
 
 pub struct SpdmTestDeps;
 
 impl SpdmDeps for SpdmTestDeps {
     type Crypto = TestCrypto;
     type Identity = TestIdentity;
+    type Vendor = TestVendor;
 }

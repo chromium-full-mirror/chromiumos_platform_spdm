@@ -36,7 +36,7 @@ pub trait GivePubKeyDispatcher {
     /// | Byte offset | Size (bytes)    | Field               | Description              |
     /// | :---------- | :-------------- | :------------------ | :----------------------- |
     /// | 0           | 1               | SPDMVersion         | SPDM_THIS_VERSION        |
-    /// | 1           | 1               | RequestResponseCode | ResponseCode::GivePubKey |
+    /// | 1           | 1               | RequestResponseCode | RequestCode::GivePubKey  |
     /// | 2           | 1               | Param1              | Reserved                 |
     /// | 3           | 1               | Param2              | Reserved                 |
     /// | 4           | PUBLIC_KEY_SIZE | PublicKey           | Public Key               |
@@ -45,7 +45,7 @@ pub trait GivePubKeyDispatcher {
     /// | Byte offset | Size (bytes) | Field               | Description             |
     /// | :---------- | :----------- | :------------------ | :---------------------- |
     /// | 0           | 1            | SPDMVersion         | SPDM_THIS_VERSION       |
-    /// | 1           | 1            | RequestResponseCode | RequestCode::GivePubKey |
+    /// | 1           | 1            | RequestResponseCode | Response::GivePubKey    |
     /// | 2           | 1            | Param1              | Reserved                |
     /// | 3           | 1            | Param2              | Reserved                |
     fn dispatch_give_pub_key_request(
@@ -100,7 +100,7 @@ mod tests {
     use zerocopy::AsBytes;
 
     use super::*;
-    use crate::deps::{SpdmTestDeps, TestIdentity, TEST_IDENTITY_PUBLIC_KEY};
+    use crate::deps::{SpdmTestDeps, TestIdentity, TestVendor, TEST_IDENTITY_PUBLIC_KEY};
     use crate::dispatch::internal::SpdmState;
     use crate::types::code::RequestCode;
     use crate::types::version::SPDM_THIS_VERSION;
@@ -111,7 +111,7 @@ mod tests {
         buf.extend_from_slice(TEST_IDENTITY_PUBLIC_KEY.as_bytes());
         let req_size = GivePubKeyRequest::SIZE;
 
-        let mut spdm = Spdm::<SpdmTestDeps>::new(TestIdentity);
+        let mut spdm = Spdm::<SpdmTestDeps>::new(TestIdentity, TestVendor);
 
         let result = spdm.dispatch_give_pub_key_request(&mut buf, req_size);
         assert_eq!(result, Ok(4));
@@ -137,7 +137,7 @@ mod tests {
                     MockResult::Return(false)
                 })
                 .run(|| {
-                    let mut spdm = Spdm::<SpdmTestDeps>::new(TestIdentity);
+                    let mut spdm = Spdm::<SpdmTestDeps>::new(TestIdentity, TestVendor);
                     spdm.state = SpdmState::WaitForRequesterKey;
 
                     let result = spdm.dispatch_give_pub_key_request(&mut buf, req_size);

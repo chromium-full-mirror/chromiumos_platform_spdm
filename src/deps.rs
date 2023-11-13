@@ -5,7 +5,9 @@
 use spdm_types::crypto::{
     AesGcm128Iv, AesGcm128Tag, EcP256UncompressedPoint, EcdsaP256Signature, Sha256Hash,
 };
-use spdm_types::deps::{Crypto, CryptoResult, CryptoStatus, Identity, IdentityPublicKey, SpdmDeps};
+use spdm_types::deps::{
+    Crypto, CryptoResult, CryptoStatus, Identity, IdentityPublicKey, SpdmDeps, Vendor,
+};
 use uninit::prelude::*;
 
 type IdentityPrivateKey = [u8; 32];
@@ -166,9 +168,19 @@ impl Identity for EalIdentity {
     }
 }
 
+/// Implements Vendor by interacting with the eal callback functions.
+pub struct EalVendor;
+
+impl Vendor for EalVendor {
+    fn process_vendor_request(&self, _buf: &mut [u8], _req_size: usize) -> usize {
+        unimplemented!()
+    }
+}
+
 pub struct SpdmEalDeps;
 
 impl SpdmDeps for SpdmEalDeps {
     type Crypto = EalCrypto;
     type Identity = EalIdentity;
+    type Vendor = EalVendor;
 }

@@ -8,6 +8,7 @@ use core::mem::MaybeUninit;
 use mocktopus::macros::*;
 use spdm_types::deps::{Crypto, SpdmDeps};
 
+use super::session_established::SessionEstablishedDispatcher;
 use super::wait_for_finish::WaitForFinishDispatcher;
 use super::wait_for_key_exchange::WaitForKeyExchangeDispatcher;
 use super::wait_for_requester_key::WaitForRequesterKeyDispatcher;
@@ -112,7 +113,10 @@ impl<D: SpdmDeps> SpdmInternalDispatcher for Spdm<D> {
         self.session.sequence_numbers.request += 1;
         let req_buf = &mut buf[REQUEST_OFFSET..];
         let req_code = parse_header(&req_buf[..req_size])?;
-        let resp_size = self.dispatch_request_internal(req_buf, req_size, req_code)?;
+        let resp_size = match self.dispatch_request_internal(req_buf, req_size, req_code) {
+            Ok(resp_size) => resp_size,
+            Err(err) => err.write_response(buf),
+        };
         let resp_size =
             encrypt_secure_message(session_id, &session_keys.response_keys, buf, resp_size)?;
         self.session.sequence_numbers.response += 1;
@@ -135,8 +139,9 @@ impl<D: SpdmDeps> SpdmInternalDispatcher for Spdm<D> {
             SpdmState::WaitForFinish => {
                 self.dispatch_request_wait_for_finish(buf, req_size, req_code)
             }
-            // TODO(b/284404632): Implement SessionEstablishedDispatcher.
-            SpdmState::SessionEstablished => Err(ErrorCode::Unspecified),
+            SpdmState::SessionEstablished => {
+                self.dispatch_request_session_established(buf, req_size, req_code)
+            }
         }
     }
 }
@@ -144,7 +149,7 @@ impl<D: SpdmDeps> SpdmInternalDispatcher for Spdm<D> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::deps::{SpdmTestDeps, TestIdentity};
+    use crate::deps::{SpdmTestDeps, TestIdentity, TestVendor};
     use crate::types::message::GET_PUBLIC_KEY_RESPONSE_SIZE;
     use crate::types::version::SPDM_THIS_VERSION;
 
@@ -153,7 +158,7 @@ mod tests {
         let mut buf = [0x10, RequestCode::GetVersion.0, 0, 0, 0, 0, 0, 0];
         let req_size = 4;
 
-        let mut spdm = Spdm::<SpdmTestDeps>::new(TestIdentity);
+        let mut spdm = Spdm::<SpdmTestDeps>::new(TestIdentity, TestVendor);
 
         let fake_transcript = [0xCC; 12];
         // Simulate the scenario that there's already some state.
@@ -174,7 +179,7 @@ mod tests {
         buf.extend_from_slice(&[0; 100]);
         let req_size = 4;
 
-        let mut spdm = Spdm::<SpdmTestDeps>::new(TestIdentity);
+        let mut spdm = Spdm::<SpdmTestDeps>::new(TestIdentity, TestVendor);
 
         let fake_transcript = [0xCC; 12];
         // Simulate the scenario that there's already some state.
@@ -195,7 +200,7 @@ mod tests {
         buf.extend_from_slice(&[0; 100]);
         let req_size = 4;
 
-        let mut spdm = Spdm::<SpdmTestDeps>::new(TestIdentity);
+        let mut spdm = Spdm::<SpdmTestDeps>::new(TestIdentity, TestVendor);
         spdm.state = SpdmState::WaitForRequesterKey;
         let result = spdm.dispatch_plaintext_request(&mut buf, req_size);
         assert_eq!(result, Err(ErrorCode::SessionRequired));
@@ -219,7 +224,7 @@ mod tests {
             buf.extend_from_slice(&[0; 100]);
             let req_size = 28;
 
-            let mut spdm = Spdm::<SpdmTestDeps>::new(TestIdentity);
+            let mut spdm = Spdm::<SpdmTestDeps>::new(TestIdentity, TestVendor);
             spdm.session.session_id = Some([0xaa, 0xbb, 0xcc, 0xdd]);
             spdm.session.th1 = Some([0xCC; 32]);
             spdm.session.handshake_secret = Some(());

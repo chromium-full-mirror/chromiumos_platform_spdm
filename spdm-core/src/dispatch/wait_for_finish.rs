@@ -88,7 +88,7 @@ mod tests {
         use mocktopus::mocking::{MockResult, Mockable};
 
         use super::super::*;
-        use crate::deps::{SpdmTestDeps, TestIdentity};
+        use crate::deps::{SpdmTestDeps, TestIdentity, TestVendor};
 
         #[test]
         fn finish_request() {
@@ -100,7 +100,7 @@ mod tests {
             Spdm::<SpdmTestDeps>::validate_finish_message_hmac
                 .mock_safe(|_, _| MockResult::Return(Ok(())));
 
-            let mut spdm = Spdm::<SpdmTestDeps>::new(TestIdentity);
+            let mut spdm = Spdm::<SpdmTestDeps>::new(TestIdentity, TestVendor);
             let result = spdm.dispatch_finish_request(&mut buf, FinishRequest::SIZE);
             assert_eq!(result, Ok(4));
         }

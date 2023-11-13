@@ -115,7 +115,7 @@ mod tests {
     use spdm_types::crypto::EC_P256_COORD_SIZE;
 
     use super::*;
-    use crate::deps::{SpdmTestDeps, TestIdentity};
+    use crate::deps::{SpdmTestDeps, TestIdentity, TestVendor};
     use crate::dispatch::wait_for_key_exchange::get_version::GetVersionDispatcher;
     use crate::types::code::RequestCode;
     use crate::types::version::SPDM_THIS_VERSION;
@@ -146,7 +146,7 @@ mod tests {
         let mut buf = get_valid_key_exchange_buffer();
         let req_size = KeyExchangeRequest::SIZE;
 
-        let mut spdm = Spdm::<SpdmTestDeps>::new(TestIdentity);
+        let mut spdm = Spdm::<SpdmTestDeps>::new(TestIdentity, TestVendor);
 
         // A GetVersion request must come first to initialize the transcript.
         let mut get_version = [0x10, RequestCode::GetVersion.0, 0, 0, 0, 0, 0, 0];
@@ -173,7 +173,7 @@ mod tests {
         let mut buf = get_valid_key_exchange_buffer();
         let req_size = KeyExchangeRequest::SIZE;
 
-        let mut spdm = Spdm::<SpdmTestDeps>::new(TestIdentity);
+        let mut spdm = Spdm::<SpdmTestDeps>::new(TestIdentity, TestVendor);
 
         let result = spdm.dispatch_key_exchange_request(&mut buf, req_size);
         assert_eq!(result, Err(ErrorCode::UnexpectedRequest));

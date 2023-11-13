@@ -23,6 +23,7 @@ pub enum RequestCode {
     // we don't want to parse them as vendor commands.
     GetPubKey = 0xF0,
     GivePubKey = 0xF1,
+    VendorCommand = 0xF2,
 }
 
 #[repr(u8)]
@@ -38,6 +39,7 @@ pub enum ResponseCode {
     // we don't want to parse them as vendor commands.
     GetPubKey = 0x10,
     GivePubKey = 0x11,
+    VendorCommand = 0x12,
 }
 
 // `Param1` and `Param2` are 1-byte params that appear in most SPDM message formats
@@ -48,7 +50,12 @@ pub type Param2 = u8;
 fn is_request_code_supported(code: RequestCode) -> bool {
     matches!(
         code,
-        RequestCode::GetVersion | RequestCode::GetPubKey | RequestCode::KeyExchange
+        RequestCode::GetVersion
+            | RequestCode::KeyExchange
+            | RequestCode::Finish
+            | RequestCode::GetPubKey
+            | RequestCode::GivePubKey
+            | RequestCode::VendorCommand
     )
 }
 

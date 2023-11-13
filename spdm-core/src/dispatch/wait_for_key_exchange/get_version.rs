@@ -68,7 +68,7 @@ impl<D: SpdmDeps> GetVersionDispatcher for Spdm<D> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::deps::{SpdmTestDeps, TestIdentity};
+    use crate::deps::{SpdmTestDeps, TestIdentity, TestVendor};
     use crate::dispatch::internal::SpdmState;
     use crate::types::code::RequestCode;
 
@@ -77,7 +77,7 @@ mod tests {
         let mut buf = [0x10, RequestCode::GetVersion.0, 0, 0, 0, 0, 0, 0];
         let req_size = 4;
 
-        let mut spdm = Spdm::<SpdmTestDeps>::new(TestIdentity);
+        let mut spdm = Spdm::<SpdmTestDeps>::new(TestIdentity, TestVendor);
 
         let result = spdm.dispatch_get_version_request(&mut buf, req_size);
         assert_eq!(result, Ok(8));

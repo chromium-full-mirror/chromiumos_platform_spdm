@@ -5,6 +5,7 @@
 //! Implements the dispatcher state machine of the SPDM responder.
 
 pub mod internal;
+mod session_established;
 mod wait_for_finish;
 mod wait_for_key_exchange;
 mod wait_for_requester_key;

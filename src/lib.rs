@@ -9,7 +9,7 @@ mod deps;
 
 use core::mem::size_of;
 
-use deps::{EalIdentity, SpdmEalDeps};
+use deps::{EalIdentity, EalVendor, SpdmEalDeps};
 use spdm::{Spdm, SpdmDispatcher};
 
 #[cfg(not(feature = "std"))]
@@ -33,13 +33,14 @@ pub struct SpdmFFI {
 #[no_mangle]
 pub unsafe extern "C" fn spdm_initialize(spdm: *mut SpdmFFI) {
     let spdm: &mut Spdm<SpdmEalDeps> = &mut *spdm.cast();
-    *spdm = Spdm::<SpdmEalDeps>::new(EalIdentity);
+    *spdm = Spdm::<SpdmEalDeps>::new(EalIdentity, EalVendor);
 }
 
 /// # Safety
 /// - `spdm` must be valid pointer for `SpdmFFI`, and the pointed data should have
 /// been initialized by `spdm_initialize` first.
 /// - `buf` must be valid pointer for `req_size` bytes, and writeable for `resp_size` bytes.
+/// - `resp_size` must be non-null.
 ///
 /// Dispatches the SPDM request to the global SPDM responder state machine.
 ///

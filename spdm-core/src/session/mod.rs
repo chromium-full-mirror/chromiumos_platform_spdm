@@ -407,7 +407,7 @@ mod tests {
     use zerocopy::FromBytes;
 
     use super::*;
-    use crate::deps::{SpdmTestDeps, TestIdentity};
+    use crate::deps::{SpdmTestDeps, TestIdentity, TestVendor};
 
     #[test]
     fn init_transcript_and_sign() {
@@ -417,7 +417,7 @@ mod tests {
         let key_exchange_response = [0xBB; 16];
         let mut signature = EcdsaP256Signature::new_zeroed();
 
-        let mut spdm = Spdm::<SpdmTestDeps>::new(TestIdentity);
+        let mut spdm = Spdm::<SpdmTestDeps>::new(TestIdentity, TestVendor);
         spdm.set_negotiation_transcript(get_version_request, version_response);
         assert!(spdm
             .init_transcript_hash_with_key_exchange_request(&key_exchange_request)
@@ -435,7 +435,7 @@ mod tests {
     fn init_transcript_hash_without_transcript() {
         let key_exchange_request = [0xAA; 8];
 
-        let mut spdm = Spdm::<SpdmTestDeps>::new(TestIdentity);
+        let mut spdm = Spdm::<SpdmTestDeps>::new(TestIdentity, TestVendor);
         assert_eq!(
             spdm.init_transcript_hash_with_key_exchange_request(&key_exchange_request),
             Err(ErrorCode::Unspecified)
@@ -446,7 +446,7 @@ mod tests {
     fn sign_without_transcript_hash() {
         let mut signature = EcdsaP256Signature::new_zeroed();
 
-        let mut spdm = Spdm::<SpdmTestDeps>::new(TestIdentity);
+        let mut spdm = Spdm::<SpdmTestDeps>::new(TestIdentity, TestVendor);
         assert_eq!(
             spdm.sign_key_exchange_message(&mut signature),
             Err(ErrorCode::Unspecified)
