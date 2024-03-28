@@ -4,24 +4,21 @@
 
 pub mod aead;
 pub mod key_schedule;
-mod sign;
+pub mod sign;
 
-#[cfg(all(test, feature = "mock"))]
+#[cfg(feature = "mock")]
 use mocktopus::macros::*;
 use spdm_types::crypto::{
     EcP256UncompressedPoint, EcdsaP256Signature, Sha256Hash, SHA256_HASH_SIZE,
 };
-use spdm_types::deps::{Crypto, Identity, IdentityPublicKey, SpdmDeps};
+use spdm_types::deps::{Crypto, IdentityPublicKey};
 use uninit::prelude::*;
 use zerocopy::AsBytes;
 
-use self::key_schedule::{generate_finished_key, generate_message_secrets, MessageSecrets};
-use self::sign::{make_message_to_sign_for_finish, make_message_to_sign_for_key_exchange};
 use crate::types::error::{ErrorCode, SpdmResult, SpdmStatus};
 use crate::types::message::{
     HalfSessionId, SequenceNumber, SessionId, GET_VERSION_REQUEST_SIZE, VERSION_RESPONSE_SIZE,
 };
-use crate::Spdm;
 
 const NEGOTIATION_TRANSCRIPT_SIZE: usize = GET_VERSION_REQUEST_SIZE + VERSION_RESPONSE_SIZE;
 pub type NegotiationTranscript = [u8; NEGOTIATION_TRANSCRIPT_SIZE];
@@ -29,7 +26,7 @@ pub type NegotiationTranscript = [u8; NEGOTIATION_TRANSCRIPT_SIZE];
 const TRANSCRIPT_HASH_SIZE: usize = SHA256_HASH_SIZE;
 pub type TranscriptHash = [u8; TRANSCRIPT_HASH_SIZE];
 
-/// Many sessions functions can be reused for processing a same functionality for
+/// Many session functions can be reused for processing a same functionality for
 /// a different direction. SpdmRole can be used to specify the direction.
 #[derive(Clone, Copy)]
 pub enum SpdmRole {
@@ -58,6 +55,7 @@ pub struct Session<C: Crypto> {
     pub handshake_secret: Option<C::HmacDerivationKeyHandle>,
     pub session_id: Option<SessionId>,
     pub requester_public_key: Option<IdentityPublicKey>,
+    pub responder_public_key: Option<IdentityPublicKey>,
     pub sequence_numbers: SequenceNumbers,
 }
 
@@ -71,6 +69,7 @@ impl<C: Crypto> Default for Session<C> {
             handshake_secret: None,
             session_id: None,
             requester_public_key: None,
+            responder_public_key: None,
             sequence_numbers: SequenceNumbers {
                 request: 0,
                 response: 0,
@@ -79,71 +78,40 @@ impl<C: Crypto> Default for Session<C> {
     }
 }
 
-/// Defines the methods related to session handling.
-///
-/// This trait is only used for separating impl blocks of `Spdm` struct by functionality.
-pub trait SpdmSessionManager {
+#[cfg_attr(feature = "mock", mockable)]
+impl<C: Crypto> Session<C> {
+    pub fn with_requester_public_key(public_key: &IdentityPublicKey) -> Self {
+        Self {
+            requester_public_key: Some(public_key.clone()),
+            ..Default::default()
+        }
+    }
+
+    pub fn with_responder_public_key(public_key: &IdentityPublicKey) -> Self {
+        Self {
+            responder_public_key: Some(public_key.clone()),
+            ..Default::default()
+        }
+    }
+
     /// Resets the current session.
-    fn reset_session(&mut self);
+    pub fn reset_session(&mut self) {
+        *self = Session::default();
+    }
 
     // Like reset_session, but keep the VCA cache so GetVersion doesn't need to be
     // sent again.
-    fn reset_session_keep_vca_cache(&mut self);
+    pub fn reset_session_keep_vca_cache(&mut self) {
+        let transcript = self.transcript;
+        *self = Session::default();
+        self.transcript = transcript;
+    }
 
     /// Sets the negotiation transcript of the current session. This is the
     /// concatenation of the GetVersion request and the Version response.
     /// The two parameters are only 4 bytes and 8 bytes each, consume them
     /// instead of passing references.
-    fn set_negotiation_transcript(
-        &mut self,
-        get_version_request: [u8; GET_VERSION_REQUEST_SIZE],
-        version_response: [u8; VERSION_RESPONSE_SIZE],
-    );
-
-    /// Set the session id.
-    fn set_session_id(&mut self, requester_half: HalfSessionId, responder_half: HalfSessionId);
-
-    // Set the requester public key.
-    fn set_requester_public_key(&mut self, public_key: &IdentityPublicKey);
-
-    // Perform ECDHE, return the resulting public key, and store the generated derivation key.
-    fn generate_handshake_secret<'a>(
-        &mut self,
-        their_public_key: &EcP256UncompressedPoint,
-        my_public_key: &'a mut MaybeUninit<EcP256UncompressedPoint>,
-    ) -> SpdmResult<&'a mut EcP256UncompressedPoint>;
-
-    // Transcript hash related helper functions.
-    fn init_transcript_hash_with_key_exchange_request(&mut self, request: &[u8]) -> SpdmStatus;
-    fn extend_transcript_hash_with_key_exchange_response(&mut self, response: &[u8]) -> SpdmStatus;
-    fn extend_transcript_hash_with_finish_request(&mut self, request: &[u8]) -> SpdmStatus;
-
-    /// Signs the key exchange message.
-    fn sign_key_exchange_message(&mut self, buf: &mut EcdsaP256Signature) -> SpdmStatus;
-
-    /// Hmacs the key exchange message, including the signature part.
-    fn hmac_key_exchange_message(&mut self, buf: &mut Sha256Hash) -> SpdmStatus;
-
-    /// Verifies the signature provided in the finish message.
-    fn verify_finish_message(&mut self, signature: &EcdsaP256Signature) -> SpdmStatus;
-
-    /// Validates the hmac provided in the finish message.
-    fn validate_finish_message_hmac(&mut self, hmac: &Sha256Hash) -> SpdmStatus;
-}
-
-#[cfg_attr(all(test, feature = "mock"), mockable)]
-impl<D: SpdmDeps> SpdmSessionManager for Spdm<D> {
-    fn reset_session(&mut self) {
-        self.session = Session::default();
-    }
-
-    fn reset_session_keep_vca_cache(&mut self) {
-        let transcript = self.session.transcript;
-        self.session = Session::default();
-        self.session.transcript = transcript;
-    }
-
-    fn set_negotiation_transcript(
+    pub fn set_negotiation_transcript(
         &mut self,
         get_version_request: [u8; GET_VERSION_REQUEST_SIZE],
         version_response: [u8; VERSION_RESPONSE_SIZE],
@@ -151,28 +119,36 @@ impl<D: SpdmDeps> SpdmSessionManager for Spdm<D> {
         let mut transcript = [0; NEGOTIATION_TRANSCRIPT_SIZE];
         transcript[0..GET_VERSION_REQUEST_SIZE].copy_from_slice(&get_version_request);
         transcript[GET_VERSION_REQUEST_SIZE..].copy_from_slice(&version_response);
-        self.session.transcript = Some(transcript);
+        self.transcript = Some(transcript);
     }
 
-    fn set_session_id(&mut self, requester_half: HalfSessionId, responder_half: HalfSessionId) {
+    /// Set the session id.
+    pub fn set_session_id(&mut self, requester_half: HalfSessionId, responder_half: HalfSessionId) {
         let mut session_id = [0; 4];
         session_id[0..2].copy_from_slice(&requester_half);
         session_id[2..4].copy_from_slice(&responder_half);
-        self.session.session_id = Some(session_id);
+        self.session_id = Some(session_id);
     }
 
-    fn set_requester_public_key(&mut self, public_key: &IdentityPublicKey) {
-        self.session.requester_public_key = Some(public_key.clone());
+    // Set the requester public key.
+    pub fn set_requester_public_key(&mut self, public_key: &IdentityPublicKey) {
+        self.requester_public_key = Some(public_key.clone());
     }
 
-    fn generate_handshake_secret<'a>(
+    // Set the responder public key.
+    pub fn set_responder_public_key(&mut self, public_key: &IdentityPublicKey) {
+        self.responder_public_key = Some(public_key.clone());
+    }
+
+    // Perform ECDHE, return the resulting public key, and store the generated derivation key.
+    pub fn generate_handshake_secret<'a>(
         &mut self,
         their_public_key: &EcP256UncompressedPoint,
         my_public_key: &'a mut MaybeUninit<EcP256UncompressedPoint>,
     ) -> SpdmResult<&'a mut EcP256UncompressedPoint> {
         const SALT_0: [u8; SHA256_HASH_SIZE] = [0; SHA256_HASH_SIZE];
-        let mut handle = MaybeUninit::<<D::Crypto as Crypto>::HmacDerivationKeyHandle>::uninit();
-        let (my_public_key, _) = D::Crypto::hmac_extract_from_ecdh(
+        let mut handle = MaybeUninit::<C::HmacDerivationKeyHandle>::uninit();
+        let (my_public_key, _) = C::hmac_extract_from_ecdh(
             their_public_key,
             &SALT_0,
             my_public_key.as_out(),
@@ -180,275 +156,130 @@ impl<D: SpdmDeps> SpdmSessionManager for Spdm<D> {
         )?;
         // SAFETY: `handle` is guaranteed to be initialized after a successful
         // `hmac_extract_from_ecdh`.
-        self.session.handshake_secret = unsafe { Some(handle.assume_init()) };
+        self.handshake_secret = unsafe { Some(handle.assume_init()) };
         Ok(my_public_key)
     }
 
-    fn init_transcript_hash_with_key_exchange_request(&mut self, request: &[u8]) -> SpdmStatus {
-        let transcript = self
-            .session
-            .transcript
+    // Transcript hash related helper functions.
+    pub fn init_transcript_hash_with_key_exchange_request(&mut self, request: &[u8]) -> SpdmStatus {
+        let transcript = self.transcript.as_ref().ok_or(ErrorCode::Unspecified)?;
+        let public_key = self
+            .responder_public_key
             .as_ref()
             .ok_or(ErrorCode::Unspecified)?;
 
-        let mut ctx = MaybeUninit::<<D::Crypto as Crypto>::Sha256HashContext>::uninit();
-        D::Crypto::sha256_init((&mut ctx).into())?;
+        let mut ctx = MaybeUninit::<C::Sha256HashContext>::uninit();
+        C::sha256_init((&mut ctx).into())?;
         // SAFETY: `ctx` is guaranteed to be initialized after a successful
         // `sha256_init`.
         let mut ctx = unsafe { ctx.assume_init() };
-        D::Crypto::sha256_update(&mut ctx, transcript)?;
+        C::sha256_update(&mut ctx, transcript)?;
         let mut key_hash = MaybeUninit::<Sha256Hash>::uninit();
-        let key_hash = D::Crypto::sha256(
-            self.identity.identity_public_key().as_bytes(),
-            (&mut key_hash).into(),
-        )?;
-        D::Crypto::sha256_update(&mut ctx, key_hash)?;
-        D::Crypto::sha256_update(&mut ctx, request)?;
-        self.session.transcript_hash_ctx = Some(ctx);
+        let key_hash = C::sha256(public_key.as_bytes(), (&mut key_hash).into())?;
+        C::sha256_update(&mut ctx, key_hash)?;
+        C::sha256_update(&mut ctx, request)?;
+        self.transcript_hash_ctx = Some(ctx);
         Ok(())
     }
 
-    fn extend_transcript_hash_with_key_exchange_response(&mut self, response: &[u8]) -> SpdmStatus {
+    pub fn extend_transcript_hash_with_key_exchange_response(
+        &mut self,
+        response: &[u8],
+    ) -> SpdmStatus {
         let ctx = self
-            .session
             .transcript_hash_ctx
             .as_mut()
             .ok_or(ErrorCode::Unspecified)?;
-        D::Crypto::sha256_update(ctx, response)?;
+        C::sha256_update(ctx, response)?;
         Ok(())
     }
 
-    fn extend_transcript_hash_with_finish_request(&mut self, request: &[u8]) -> SpdmStatus {
+    pub fn extend_transcript_hash_with_finish_request(&mut self, request: &[u8]) -> SpdmStatus {
         let ctx = self
-            .session
             .transcript_hash_ctx
             .as_mut()
             .ok_or(ErrorCode::Unspecified)?;
         let public_key = self
-            .session
             .requester_public_key
             .as_ref()
             .ok_or(ErrorCode::Unspecified)?;
         let mut key_hash = MaybeUninit::<Sha256Hash>::uninit();
-        let key_hash = D::Crypto::sha256(public_key.as_bytes(), (&mut key_hash).into())?;
-        D::Crypto::sha256_update(ctx, key_hash)?;
-        D::Crypto::sha256_update(ctx, request)?;
+        let key_hash = C::sha256(public_key.as_bytes(), (&mut key_hash).into())?;
+        C::sha256_update(ctx, key_hash)?;
+        C::sha256_update(ctx, request)?;
         Ok(())
     }
 
-    fn sign_key_exchange_message(&mut self, buf: &mut EcdsaP256Signature) -> SpdmStatus {
-        let ctx = self
-            .session
-            .transcript_hash_ctx
-            .as_ref()
-            .ok_or(ErrorCode::Unspecified)?;
-
-        let mut transcipt_hash = MaybeUninit::<Sha256Hash>::uninit();
-        let transcipt_hash: &_ = D::Crypto::sha256_get(ctx, (&mut transcipt_hash).into())?;
-
-        let mut hash_to_sign = MaybeUninit::<Sha256Hash>::uninit();
-        let hash_to_sign = make_message_to_sign_for_key_exchange::<D::Crypto>(
-            transcipt_hash,
-            (&mut hash_to_sign).into(),
-        )?;
-        let sig = D::Crypto::ecdsa_sign(
-            self.identity.identity_private_key_handle(),
-            hash_to_sign,
-            buf.manually_drop_mut().into(),
-        )?;
-        // Update the transcript after signing.
-        self.extend_transcript_hash_with_key_exchange_signature(sig)?;
-        Ok(())
-    }
-
-    fn hmac_key_exchange_message(&mut self, buf: &mut Sha256Hash) -> SpdmStatus {
-        let mut message_secrets = MaybeUninit::<MessageSecrets<D::Crypto>>::uninit();
-        let secrets = generate_message_secrets(
-            &self.session,
-            SessionPhase::Handshake,
-            (&mut message_secrets).into(),
-        )?;
-        let th1 = self.session.th1.as_ref().ok_or(ErrorCode::Unspecified)?;
-        let mut finished_key = MaybeUninit::<<D::Crypto as Crypto>::HmacSecretKeyHandle>::uninit();
-        let finished_key =
-            generate_finished_key(SpdmRole::Responder, secrets, (&mut finished_key).into())?;
-        D::Crypto::hmac(finished_key, th1, buf.into())?;
-        self.extend_transcript_hash_with_key_exchange_hmac(buf)?;
-        Ok(())
-    }
-
-    fn verify_finish_message(&mut self, signature: &EcdsaP256Signature) -> SpdmStatus {
-        let ctx = self
-            .session
-            .transcript_hash_ctx
-            .as_ref()
-            .ok_or(ErrorCode::Unspecified)?;
-        let public_key = self
-            .session
-            .requester_public_key
-            .as_ref()
-            .ok_or(ErrorCode::Unspecified)?;
-
-        let mut transcipt_hash = MaybeUninit::<Sha256Hash>::uninit();
-        let transcipt_hash: &_ = D::Crypto::sha256_get(ctx, (&mut transcipt_hash).into())?;
-
-        let mut hash_to_sign = MaybeUninit::<Sha256Hash>::uninit();
-        let hash_to_sign = make_message_to_sign_for_finish::<D::Crypto>(
-            transcipt_hash,
-            (&mut hash_to_sign).into(),
-        )?;
-        D::Crypto::ecdsa_verify(public_key, hash_to_sign, signature)?;
-        // Update the transcript after verifying.
-        self.extend_transcript_hash_with_finish_signature(signature)?;
-        Ok(())
-    }
-
-    fn validate_finish_message_hmac(&mut self, hmac: &Sha256Hash) -> SpdmStatus {
-        let ctx = self
-            .session
-            .transcript_hash_ctx
-            .as_ref()
-            .ok_or(ErrorCode::Unspecified)?;
-
-        let mut message_secrets = MaybeUninit::<MessageSecrets<D::Crypto>>::uninit();
-        let secrets = generate_message_secrets(
-            &self.session,
-            SessionPhase::Handshake,
-            (&mut message_secrets).into(),
-        )?;
-
-        let mut transcipt_hash = MaybeUninit::<Sha256Hash>::uninit();
-        let transcipt_hash: &_ = D::Crypto::sha256_get(ctx, (&mut transcipt_hash).into())?;
-
-        let mut finished_key = MaybeUninit::<<D::Crypto as Crypto>::HmacSecretKeyHandle>::uninit();
-        let finished_key =
-            generate_finished_key(SpdmRole::Requester, secrets, (&mut finished_key).into())?;
-        D::Crypto::validate_hmac(finished_key, transcipt_hash, hmac)?;
-        self.extend_transcript_hash_with_finish_hmac(hmac)?;
-        Ok(())
-    }
-}
-
-/// Defines the private methods related to session handling.
-///
-/// This trait is only used for separating impl blocks of `Spdm` struct by functionality.
-trait SpdmSessionManagerPrivate {
-    // Transcript hash related helper functions.
-    fn extend_transcript_hash_with_key_exchange_signature(
-        &mut self,
-        signature: &EcdsaP256Signature,
-    ) -> SpdmStatus;
-    fn extend_transcript_hash_with_key_exchange_hmac(&mut self, hmac: &Sha256Hash) -> SpdmStatus;
-    fn extend_transcript_hash_with_finish_signature(
-        &mut self,
-        signature: &EcdsaP256Signature,
-    ) -> SpdmStatus;
-    fn extend_transcript_hash_with_finish_hmac(&mut self, hmac: &Sha256Hash) -> SpdmStatus;
-}
-
-impl<D: SpdmDeps> SpdmSessionManagerPrivate for Spdm<D> {
-    fn extend_transcript_hash_with_key_exchange_signature(
+    pub fn extend_transcript_hash_with_key_exchange_signature(
         &mut self,
         signature: &EcdsaP256Signature,
     ) -> SpdmStatus {
         let ctx = self
-            .session
             .transcript_hash_ctx
             .as_mut()
             .ok_or(ErrorCode::Unspecified)?;
-        D::Crypto::sha256_update(ctx, signature.as_bytes())?;
+        C::sha256_update(ctx, signature.as_bytes())?;
         // Finalize TH1 here.
         let mut hash = MaybeUninit::<Sha256Hash>::uninit();
-        D::Crypto::sha256_get(ctx, (&mut hash).into())?;
+        C::sha256_get(ctx, (&mut hash).into())?;
         // SAFETY: `hash` is guaranteed to be initialized after a successful
         // `sha256_get`.
-        self.session.th1 = Some(unsafe { hash.assume_init() });
+        self.th1 = Some(unsafe { hash.assume_init() });
         Ok(())
     }
-    fn extend_transcript_hash_with_key_exchange_hmac(&mut self, hmac: &Sha256Hash) -> SpdmStatus {
+
+    pub fn extend_transcript_hash_with_key_exchange_hmac(
+        &mut self,
+        hmac: &Sha256Hash,
+    ) -> SpdmStatus {
         let ctx = self
-            .session
             .transcript_hash_ctx
             .as_mut()
             .ok_or(ErrorCode::Unspecified)?;
-        D::Crypto::sha256_update(ctx, hmac)?;
+        C::sha256_update(ctx, hmac)?;
         Ok(())
     }
-    fn extend_transcript_hash_with_finish_signature(
+
+    pub fn extend_transcript_hash_with_finish_signature(
         &mut self,
         signature: &EcdsaP256Signature,
     ) -> SpdmStatus {
         let ctx = self
-            .session
             .transcript_hash_ctx
             .as_mut()
             .ok_or(ErrorCode::Unspecified)?;
-        D::Crypto::sha256_update(ctx, signature.as_bytes())?;
+        C::sha256_update(ctx, signature.as_bytes())?;
         Ok(())
     }
-    fn extend_transcript_hash_with_finish_hmac(&mut self, hmac: &Sha256Hash) -> SpdmStatus {
+
+    pub fn extend_transcript_hash_with_finish_hmac(&mut self, hmac: &Sha256Hash) -> SpdmStatus {
         let mut ctx = self
-            .session
             .transcript_hash_ctx
             .take()
             .ok_or(ErrorCode::Unspecified)?;
-        D::Crypto::sha256_update(&mut ctx, hmac)?;
+        C::sha256_update(&mut ctx, hmac)?;
         let mut hash = MaybeUninit::<Sha256Hash>::uninit();
-        D::Crypto::sha256_final(ctx, (&mut hash).into())?;
+        C::sha256_final(ctx, (&mut hash).into())?;
         // SAFETY: `hash` is guaranteed to be initialized after a successful
         // `sha256_final`.
-        self.session.th2 = Some(unsafe { hash.assume_init() });
+        self.th2 = Some(unsafe { hash.assume_init() });
         Ok(())
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use zerocopy::FromBytes;
+    use spdm_test_deps::TestCrypto;
 
     use super::*;
-    use crate::deps::{SpdmTestDeps, TestIdentity, TestVendor};
-
-    #[test]
-    fn init_transcript_and_sign() {
-        let get_version_request = [0xAA; 4];
-        let version_response = [0xBB; 8];
-        let key_exchange_request = [0xAA; 8];
-        let key_exchange_response = [0xBB; 16];
-        let mut signature = EcdsaP256Signature::new_zeroed();
-
-        let mut spdm = Spdm::<SpdmTestDeps>::new(TestIdentity, TestVendor);
-        spdm.set_negotiation_transcript(get_version_request, version_response);
-        assert!(spdm
-            .init_transcript_hash_with_key_exchange_request(&key_exchange_request)
-            .is_ok());
-        // Caveat: The current implementation isn't capable of checking whether hash is
-        // extended with the key exchange response before signing. We might need to
-        // introduce more state if we want this enforcement.
-        assert!(spdm
-            .extend_transcript_hash_with_key_exchange_response(&key_exchange_response)
-            .is_ok());
-        assert!(spdm.sign_key_exchange_message(&mut signature).is_ok());
-    }
 
     #[test]
     fn init_transcript_hash_without_transcript() {
         let key_exchange_request = [0xAA; 8];
 
-        let mut spdm = Spdm::<SpdmTestDeps>::new(TestIdentity, TestVendor);
+        let mut session = Session::<TestCrypto>::default();
         assert_eq!(
-            spdm.init_transcript_hash_with_key_exchange_request(&key_exchange_request),
-            Err(ErrorCode::Unspecified)
-        );
-    }
-
-    #[test]
-    fn sign_without_transcript_hash() {
-        let mut signature = EcdsaP256Signature::new_zeroed();
-
-        let mut spdm = Spdm::<SpdmTestDeps>::new(TestIdentity, TestVendor);
-        assert_eq!(
-            spdm.sign_key_exchange_message(&mut signature),
+            session.init_transcript_hash_with_key_exchange_request(&key_exchange_request),
             Err(ErrorCode::Unspecified)
         );
     }

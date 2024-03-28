@@ -1,0 +1,8 @@
+[package]
+name = "spdm_proc_macros"
+version = "0.0.1"
+edition = "2021"
+
+[lib]
+name = "spdm_proc_macros"
+proc-macro = true

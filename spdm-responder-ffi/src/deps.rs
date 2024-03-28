@@ -2,12 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use spdm_responder::ResponderDeps;
 use spdm_types::crypto::{
     AesGcm128Iv, AesGcm128Tag, EcP256UncompressedPoint, EcdsaP256Signature, Sha256Hash,
 };
-use spdm_types::deps::{
-    Crypto, CryptoResult, CryptoStatus, Identity, IdentityPublicKey, SpdmDeps, Vendor,
-};
+use spdm_types::deps::{Crypto, CryptoResult, CryptoStatus, Identity, IdentityPublicKey, Vendor};
 use uninit::prelude::*;
 
 type IdentityPrivateKey = [u8; 32];
@@ -177,9 +176,9 @@ impl Vendor for EalVendor {
     }
 }
 
-pub struct SpdmEalDeps;
+pub struct EalResponderDeps;
 
-impl SpdmDeps for SpdmEalDeps {
+impl ResponderDeps for EalResponderDeps {
     type Crypto = EalCrypto;
     type Identity = EalIdentity;
     type Vendor = EalVendor;

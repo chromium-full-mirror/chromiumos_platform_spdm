@@ -2,20 +2,19 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use spdm_types::deps::{Identity, SpdmDeps};
+use spdm::types::code::{RequestCode, ResponseCode};
+use spdm::types::error::{ErrorCode, SpdmResult};
+use spdm::types::message::GivePubKeyRequest;
+use spdm_types::deps::Identity;
 
-use super::internal::SpdmState;
-use crate::session::SpdmSessionManager;
-use crate::types::code::{RequestCode, ResponseCode};
-use crate::types::error::{ErrorCode, SpdmResult};
-use crate::types::message::GivePubKeyRequest;
-use crate::Spdm;
+use super::internal::ResponderState;
+use crate::{Responder, ResponderDeps};
 
 /// WaitForRequesterKeyDispatcher handles the state where the responder is waiting
 /// for the requester to provide their public key. After processing GivePubKey
 /// request successfully, the state handler should advance to the next state.
 ///
-/// This trait is only used for separating impl blocks of `Spdm` struct by functionality.
+/// This trait is only used for separating impl blocks of `Responder` struct by functionality.
 pub trait WaitForRequesterKeyDispatcher {
     fn dispatch_request_wait_for_requester_key(
         &mut self,
@@ -27,7 +26,7 @@ pub trait WaitForRequesterKeyDispatcher {
 
 /// GivePubKeyDispatcher handles the GivePubKey request.
 ///
-/// This trait is only used for separating impl blocks of `Spdm` struct by functionality.
+/// This trait is only used for separating impl blocks of `Responder` struct by functionality.
 pub trait GivePubKeyDispatcher {
     /// Handles the GivePubKey request and if successful, writes the GivePubKey response to `buf`.
     ///
@@ -55,7 +54,7 @@ pub trait GivePubKeyDispatcher {
     ) -> SpdmResult<usize>;
 }
 
-impl<D: SpdmDeps> GivePubKeyDispatcher for Spdm<D> {
+impl<D: ResponderDeps> GivePubKeyDispatcher for Responder<D> {
     fn dispatch_give_pub_key_request(
         &mut self,
         buf: &mut [u8],
@@ -72,16 +71,16 @@ impl<D: SpdmDeps> GivePubKeyDispatcher for Spdm<D> {
             return Err(ErrorCode::InvalidRequest);
         }
 
-        self.set_requester_public_key(&request.public_key);
+        self.session.set_requester_public_key(&request.public_key);
         buf[1] = ResponseCode::GivePubKey.0;
 
         // Advance state.
-        self.state = SpdmState::WaitForFinish;
+        self.state = ResponderState::WaitForFinish;
         Ok(4)
     }
 }
 
-impl<D: SpdmDeps> WaitForRequesterKeyDispatcher for Spdm<D> {
+impl<D: ResponderDeps> WaitForRequesterKeyDispatcher for Responder<D> {
     fn dispatch_request_wait_for_requester_key(
         &mut self,
         buf: &mut [u8],
@@ -97,13 +96,14 @@ impl<D: SpdmDeps> WaitForRequesterKeyDispatcher for Spdm<D> {
 
 #[cfg(test)]
 mod tests {
+    use spdm::types::code::RequestCode;
+    use spdm_test_deps::{TestIdentity, TestVendor, TEST_IDENTITY_PUBLIC_KEY};
     use zerocopy::AsBytes;
 
     use super::*;
-    use crate::deps::{SpdmTestDeps, TestIdentity, TestVendor, TEST_IDENTITY_PUBLIC_KEY};
-    use crate::dispatch::internal::SpdmState;
-    use crate::types::code::RequestCode;
-    use crate::types::version::SPDM_THIS_VERSION;
+    use crate::dispatch::internal::ResponderState;
+    use crate::test::TestResponderDeps;
+    use crate::version::SPDM_THIS_VERSION;
 
     #[test]
     fn give_pub_key_request() {
@@ -111,12 +111,12 @@ mod tests {
         buf.extend_from_slice(TEST_IDENTITY_PUBLIC_KEY.as_bytes());
         let req_size = GivePubKeyRequest::SIZE;
 
-        let mut spdm = Spdm::<SpdmTestDeps>::new(TestIdentity, TestVendor);
+        let mut spdm = Responder::<TestResponderDeps>::new(TestIdentity, TestVendor);
 
         let result = spdm.dispatch_give_pub_key_request(&mut buf, req_size);
         assert_eq!(result, Ok(4));
         assert!(spdm.session.requester_public_key.is_some());
-        assert!(matches!(spdm.state, SpdmState::WaitForFinish));
+        assert!(matches!(spdm.state, ResponderState::WaitForFinish));
     }
 
     #[cfg(feature = "mock")]
@@ -137,12 +137,12 @@ mod tests {
                     MockResult::Return(false)
                 })
                 .run(|| {
-                    let mut spdm = Spdm::<SpdmTestDeps>::new(TestIdentity, TestVendor);
-                    spdm.state = SpdmState::WaitForRequesterKey;
+                    let mut spdm = Responder::<TestResponderDeps>::new(TestIdentity, TestVendor);
+                    spdm.state = ResponderState::WaitForRequesterKey;
 
                     let result = spdm.dispatch_give_pub_key_request(&mut buf, req_size);
                     assert_eq!(result, Err(ErrorCode::InvalidRequest));
-                    assert!(matches!(spdm.state, SpdmState::WaitForRequesterKey));
+                    assert!(matches!(spdm.state, ResponderState::WaitForRequesterKey));
                 });
         }
     }

@@ -2,17 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use spdm_types::deps::{Identity, IdentityPublicKey, SpdmDeps};
+use spdm::types::code::ResponseCode;
+use spdm::types::error::{ErrorCode, SpdmResult};
+use spdm::types::message::GET_PUBLIC_KEY_RESPONSE_SIZE;
+use spdm_types::deps::{Identity, IdentityPublicKey};
 use zerocopy::AsBytes;
 
-use crate::types::code::ResponseCode;
-use crate::types::error::{ErrorCode, SpdmResult};
-use crate::types::message::GET_PUBLIC_KEY_RESPONSE_SIZE;
-use crate::Spdm;
+use crate::{Responder, ResponderDeps};
 
 /// GetPubKeyDispatcher handles the GetPubKey request.
 ///
-/// This trait is only used for separating impl blocks of `Spdm` struct by functionality.
+/// This trait is only used for separating impl blocks of `Responder` struct by functionality.
 pub trait GetPubKeyDispatcher {
     /// Handles the GetPubKey request and if successful, writes the GetPubKey response to `buf`.
     ///
@@ -41,7 +41,7 @@ pub trait GetPubKeyDispatcher {
     ) -> SpdmResult<usize>;
 }
 
-impl<D: SpdmDeps> GetPubKeyDispatcher for Spdm<D> {
+impl<D: ResponderDeps> GetPubKeyDispatcher for Responder<D> {
     fn dispatch_get_pub_key_request(
         &mut self,
         buf: &mut [u8],
@@ -61,11 +61,13 @@ impl<D: SpdmDeps> GetPubKeyDispatcher for Spdm<D> {
 
 #[cfg(test)]
 mod tests {
+    use spdm::types::code::RequestCode;
+    use spdm_test_deps::{TestIdentity, TestVendor, TEST_IDENTITY_PUBLIC_KEY};
+
     use super::*;
-    use crate::deps::{SpdmTestDeps, TestIdentity, TestVendor, TEST_IDENTITY_PUBLIC_KEY};
-    use crate::dispatch::internal::SpdmState;
-    use crate::types::code::RequestCode;
-    use crate::types::version::SPDM_THIS_VERSION;
+    use crate::dispatch::internal::ResponderState;
+    use crate::test::TestResponderDeps;
+    use crate::version::SPDM_THIS_VERSION;
 
     #[test]
     fn get_pub_key_request() {
@@ -73,7 +75,7 @@ mod tests {
         buf.extend_from_slice(&[0; 100]);
         let req_size = 4;
 
-        let mut spdm = Spdm::<SpdmTestDeps>::new(TestIdentity, TestVendor);
+        let mut spdm = Responder::<TestResponderDeps>::new(TestIdentity, TestVendor);
 
         let result = spdm.dispatch_get_pub_key_request(&mut buf, req_size);
         assert_eq!(result, Ok(GET_PUBLIC_KEY_RESPONSE_SIZE));
@@ -81,6 +83,6 @@ mod tests {
             &buf[4..GET_PUBLIC_KEY_RESPONSE_SIZE],
             TEST_IDENTITY_PUBLIC_KEY.as_bytes()
         );
-        assert!(matches!(spdm.state, SpdmState::WaitForKeyExchange));
+        assert!(matches!(spdm.state, ResponderState::WaitForKeyExchange));
     }
 }

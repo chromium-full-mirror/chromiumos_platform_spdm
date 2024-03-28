@@ -6,38 +6,40 @@ use core::mem::MaybeUninit;
 
 #[cfg(all(test, feature = "mock"))]
 use mocktopus::macros::*;
-use spdm_types::deps::{Crypto, SpdmDeps};
+use spdm::session::aead::{decrypt_secure_message, encrypt_secure_message, REQUEST_OFFSET};
+use spdm::session::key_schedule::{
+    generate_aead_keys, generate_message_secrets, AeadSessionKeys, MessageSecrets,
+};
+use spdm::session::{Session, SessionPhase};
+use spdm::types::code::RequestCode;
+use spdm::types::error::{ErrorCode, SpdmResult};
+use spdm_types::deps::Crypto;
 
 use super::session_established::SessionEstablishedDispatcher;
 use super::wait_for_finish::WaitForFinishDispatcher;
 use super::wait_for_key_exchange::WaitForKeyExchangeDispatcher;
 use super::wait_for_requester_key::WaitForRequesterKeyDispatcher;
-use crate::session::aead::{decrypt_secure_message, encrypt_secure_message, REQUEST_OFFSET};
-use crate::session::key_schedule::{
-    generate_aead_keys, generate_message_secrets, AeadSessionKeys, MessageSecrets,
-};
-use crate::session::{Session, SessionPhase, SpdmSessionManager};
-use crate::types::code::{parse_header, RequestCode};
-use crate::types::error::{ErrorCode, SpdmResult};
-use crate::Spdm;
+use crate::code::parse_header;
+use crate::error::error_response;
+use crate::{Responder, ResponderDeps};
 
-/// The SpdmState is an enum that holds the current state. In each state the
+/// The ResponderState is an enum that holds the current state. In each state the
 /// dispatcher expects to receive different requests.
 #[derive(Clone, Copy)]
-pub enum SpdmState {
+pub enum ResponderState {
     WaitForKeyExchange,
     WaitForRequesterKey,
     WaitForFinish,
     SessionEstablished,
 }
 
-impl Default for SpdmState {
+impl Default for ResponderState {
     fn default() -> Self {
         Self::WaitForKeyExchange
     }
 }
 
-impl SpdmState {
+impl ResponderState {
     fn phase(self) -> SessionPhase {
         match self {
             Self::WaitForKeyExchange => SessionPhase::None,
@@ -50,8 +52,8 @@ impl SpdmState {
 /// Defines the methods related to dispatching a request internally, including
 /// dealing with encrypted/plaintext request/response.
 ///
-/// This trait is only used for separating impl blocks of `Spdm` struct by functionality.
-pub trait SpdmInternalDispatcher {
+/// This trait is only used for separating impl blocks of `Responder` struct by functionality.
+pub trait InternalDispatcher {
     /// Dispatches a plaintext SPDM request.
     fn dispatch_plaintext_request(&mut self, buf: &mut [u8], req_size: usize) -> SpdmResult<usize>;
 
@@ -78,19 +80,19 @@ fn get_session_keys<'a, C: Crypto>(
 }
 
 #[cfg_attr(all(test, feature = "mock"), mockable)]
-impl<D: SpdmDeps> SpdmInternalDispatcher for Spdm<D> {
+impl<D: ResponderDeps> InternalDispatcher for Responder<D> {
     fn dispatch_plaintext_request(&mut self, buf: &mut [u8], req_size: usize) -> SpdmResult<usize> {
         if buf.len() < req_size {
             return Err(ErrorCode::Unspecified);
         }
         let req_code = parse_header(&buf[..req_size])?;
         if req_code == RequestCode::GetVersion {
-            self.reset_session();
-            self.state = SpdmState::default();
+            self.session.reset_session();
+            self.state = ResponderState::default();
         }
         if req_code == RequestCode::GetPubKey {
-            self.reset_session_keep_vca_cache();
-            self.state = SpdmState::default();
+            self.session.reset_session_keep_vca_cache();
+            self.state = ResponderState::default();
         }
         if self.state.phase() != SessionPhase::None {
             return Err(ErrorCode::SessionRequired);
@@ -115,7 +117,7 @@ impl<D: SpdmDeps> SpdmInternalDispatcher for Spdm<D> {
         let req_code = parse_header(&req_buf[..req_size])?;
         let resp_size = match self.dispatch_request_internal(req_buf, req_size, req_code) {
             Ok(resp_size) => resp_size,
-            Err(err) => err.write_response(buf),
+            Err(err) => error_response(buf, err),
         };
         let resp_size =
             encrypt_secure_message(session_id, &session_keys.response_keys, buf, resp_size)?;
@@ -130,16 +132,16 @@ impl<D: SpdmDeps> SpdmInternalDispatcher for Spdm<D> {
         req_code: RequestCode,
     ) -> SpdmResult<usize> {
         match self.state {
-            SpdmState::WaitForKeyExchange => {
+            ResponderState::WaitForKeyExchange => {
                 self.dispatch_request_wait_for_key_exchange(buf, req_size, req_code)
             }
-            SpdmState::WaitForRequesterKey => {
+            ResponderState::WaitForRequesterKey => {
                 self.dispatch_request_wait_for_requester_key(buf, req_size, req_code)
             }
-            SpdmState::WaitForFinish => {
+            ResponderState::WaitForFinish => {
                 self.dispatch_request_wait_for_finish(buf, req_size, req_code)
             }
-            SpdmState::SessionEstablished => {
+            ResponderState::SessionEstablished => {
                 self.dispatch_request_session_established(buf, req_size, req_code)
             }
         }
@@ -148,17 +150,19 @@ impl<D: SpdmDeps> SpdmInternalDispatcher for Spdm<D> {
 
 #[cfg(test)]
 mod tests {
+    use spdm::types::message::GET_PUBLIC_KEY_RESPONSE_SIZE;
+    use spdm_test_deps::{TestIdentity, TestVendor};
+
     use super::*;
-    use crate::deps::{SpdmTestDeps, TestIdentity, TestVendor};
-    use crate::types::message::GET_PUBLIC_KEY_RESPONSE_SIZE;
-    use crate::types::version::SPDM_THIS_VERSION;
+    use crate::test::TestResponderDeps;
+    use crate::version::SPDM_THIS_VERSION;
 
     #[test]
     fn plaintext_get_version_resets_session() {
         let mut buf = [0x10, RequestCode::GetVersion.0, 0, 0, 0, 0, 0, 0];
         let req_size = 4;
 
-        let mut spdm = Spdm::<SpdmTestDeps>::new(TestIdentity, TestVendor);
+        let mut spdm = Responder::<TestResponderDeps>::new(TestIdentity, TestVendor);
 
         let fake_transcript = [0xCC; 12];
         // Simulate the scenario that there's already some state.
@@ -179,7 +183,7 @@ mod tests {
         buf.extend_from_slice(&[0; 100]);
         let req_size = 4;
 
-        let mut spdm = Spdm::<SpdmTestDeps>::new(TestIdentity, TestVendor);
+        let mut spdm = Responder::<TestResponderDeps>::new(TestIdentity, TestVendor);
 
         let fake_transcript = [0xCC; 12];
         // Simulate the scenario that there's already some state.
@@ -200,8 +204,8 @@ mod tests {
         buf.extend_from_slice(&[0; 100]);
         let req_size = 4;
 
-        let mut spdm = Spdm::<SpdmTestDeps>::new(TestIdentity, TestVendor);
-        spdm.state = SpdmState::WaitForRequesterKey;
+        let mut spdm = Responder::<TestResponderDeps>::new(TestIdentity, TestVendor);
+        spdm.state = ResponderState::WaitForRequesterKey;
         let result = spdm.dispatch_plaintext_request(&mut buf, req_size);
         assert_eq!(result, Err(ErrorCode::SessionRequired));
     }
@@ -209,9 +213,9 @@ mod tests {
     #[cfg(feature = "mock")]
     mod mock {
         use mocktopus::mocking::{MockContext, MockResult};
+        use spdm_test_deps::TestCrypto;
 
         use super::*;
-        use crate::deps::TestCrypto;
 
         #[test]
         fn dispatch_secure_request() {
@@ -224,11 +228,11 @@ mod tests {
             buf.extend_from_slice(&[0; 100]);
             let req_size = 28;
 
-            let mut spdm = Spdm::<SpdmTestDeps>::new(TestIdentity, TestVendor);
+            let mut spdm = Responder::<TestResponderDeps>::new(TestIdentity, TestVendor);
             spdm.session.session_id = Some([0xaa, 0xbb, 0xcc, 0xdd]);
             spdm.session.th1 = Some([0xCC; 32]);
             spdm.session.handshake_secret = Some(());
-            spdm.state = SpdmState::WaitForRequesterKey;
+            spdm.state = ResponderState::WaitForRequesterKey;
             MockContext::new()
                 .mock_safe(TestCrypto::aes_gcm_decrypt, |_, _, _, _, buf| {
                     assert_eq!(buf, stub_encrypted_req);
@@ -236,7 +240,7 @@ mod tests {
                     MockResult::Return(Ok(()))
                 })
                 .mock_safe(
-                    Spdm::<SpdmTestDeps>::dispatch_request_internal,
+                    Responder::<TestResponderDeps>::dispatch_request_internal,
                     |_, _, req_size, _| MockResult::Return(Ok(req_size)),
                 )
                 .run(|| {

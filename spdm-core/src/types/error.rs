@@ -3,15 +3,13 @@
 // found in the LICENSE file.
 
 use open_enum::open_enum;
+use spdm_proc_macros::cfg_host_attr;
 use spdm_types::deps::CryptoError;
-
-use super::code::ResponseCode;
-use super::version::SPDM_THIS_VERSION;
 
 #[repr(u8)]
 #[open_enum]
+#[cfg_host_attr(derive(Debug))]
 #[derive(Clone, Copy)]
-#[cfg_attr(test, derive(Debug))]
 pub enum ErrorCode {
     // One or more request fields are invalid.
     InvalidRequest = 0x01,
@@ -33,31 +31,6 @@ pub enum ErrorCode {
     VersionMismatch = 0x41,
 }
 
-impl ErrorCode {
-    /// Writes the error response containing the specified `error` to `buf`.
-    ///
-    /// Error response format:
-    ///
-    /// | Byte offset | Size (bytes) | Field               | Description         |
-    /// | :---------- | :----------- | :------------------ | :------------------ |
-    /// | 0           | 1            | SPDMVersion         | SPDM_THIS_VERSION   |
-    /// | 1           | 1            | RequestResponseCode | ResponseCode::Error |
-    /// | 2           | 1            | Param1              | Error code          |
-    /// | 3           | 1            | Param2              | Error data          |
-    pub fn write_response(self, buf: &mut [u8]) -> usize {
-        // No space to write even an error response. Return an empty response buffer.
-        if buf.len() < 4 {
-            return 0;
-        }
-        buf[0] = SPDM_THIS_VERSION;
-        buf[1] = ResponseCode::Error.0;
-        buf[2] = self.0;
-        // We haven't introduced any errors that need to set the Param2 field.
-        buf[3] = 0;
-        4
-    }
-}
-
 impl From<CryptoError> for ErrorCode {
     /// Always default to Unspecified for `Crypto` errors.
     fn from(_value: CryptoError) -> Self {
@@ -68,23 +41,3 @@ impl From<CryptoError> for ErrorCode {
 // Helpful `Result` alias that use `ErrorCode` as error type.
 pub type SpdmResult<T> = Result<T, ErrorCode>;
 pub type SpdmStatus = SpdmResult<()>;
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn write_error_buffer_too_small() {
-        let mut buf = [0; 3];
-        assert_eq!(ErrorCode::Unspecified.write_response(&mut buf), 0);
-    }
-
-    #[test]
-    fn write_error_success() {
-        let mut buf = [0; 10];
-        let error = ErrorCode::Unspecified;
-        assert_eq!(ErrorCode::Unspecified.write_response(&mut buf), 4);
-        let expected_data = [SPDM_THIS_VERSION, ResponseCode::Error.0, error.0, 0];
-        assert_eq!(buf[0..4], expected_data[..]);
-    }
-}

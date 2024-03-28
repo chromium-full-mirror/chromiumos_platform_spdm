@@ -4,20 +4,20 @@
 
 use core::mem::MaybeUninit;
 
+use spdm::types::code::ResponseCode;
+use spdm::types::error::{ErrorCode, SpdmResult};
+use spdm::types::message::{HalfSessionId, KeyExchangeRequest, KeyExchangeResponse};
 use spdm_types::crypto::EcP256UncompressedPoint;
-use spdm_types::deps::{Crypto, SpdmDeps};
+use spdm_types::deps::{Crypto, Identity};
 use zerocopy::AsBytes;
 
-use crate::dispatch::internal::SpdmState;
-use crate::session::SpdmSessionManager;
-use crate::types::code::ResponseCode;
-use crate::types::error::{ErrorCode, SpdmResult};
-use crate::types::message::{HalfSessionId, KeyExchangeRequest, KeyExchangeResponse};
-use crate::Spdm;
+use crate::dispatch::internal::ResponderState;
+use crate::session::ResponderSession;
+use crate::{Responder, ResponderDeps};
 
 /// KeyExchangeDispatcher handles the KeyExchange request.
 ///
-/// This trait is only used for separating impl blocks of `Spdm` struct by functionality.
+/// This trait is only used for separating impl blocks of `Responder` struct by functionality.
 pub trait KeyExchangeDispatcher {
     /// Handles the KeyExchange request and if successful, writes the KeyExchange response to `buf`.
     /// KeyExchange request format: see `KeyExchangeRequest` struct.
@@ -29,30 +29,28 @@ pub trait KeyExchangeDispatcher {
     ) -> SpdmResult<usize>;
 }
 
-impl KeyExchangeResponse {
-    fn write_partial_response<'a, C: Crypto>(
-        buf: &'a mut [u8],
-        half_session_id: HalfSessionId,
-        public_key: &mut EcP256UncompressedPoint,
-    ) -> SpdmResult<&'a mut Self> {
-        let response: &mut KeyExchangeResponse = (&mut buf[..KeyExchangeResponse::SIZE])
-            .try_into()
-            .map_err(|_| ErrorCode::Unspecified)?;
-        response.response_code = ResponseCode::KeyExchange;
-        response.param1 = KeyExchangeResponse::NO_HEARTBEAT;
-        // Zero reserved field.
-        response.param2 = 0;
-        response.resp_session_id = half_session_id;
-        response.mut_auth_requested = KeyExchangeResponse::NO_ENCAPSULATE;
-        response.slot_id_param = KeyExchangeResponse::PROVISIONED_SLOT_ID;
-        C::random_bytes(response.random_data.as_mut().into())?;
-        response.exchange_data = public_key.clone();
-        response.opaque_data_size = 0.into();
-        Ok(response)
-    }
+fn write_partial_response<'a, C: Crypto>(
+    buf: &'a mut [u8],
+    half_session_id: HalfSessionId,
+    public_key: &mut EcP256UncompressedPoint,
+) -> SpdmResult<&'a mut KeyExchangeResponse> {
+    let response: &mut KeyExchangeResponse = (&mut buf[..KeyExchangeResponse::SIZE])
+        .try_into()
+        .map_err(|_| ErrorCode::Unspecified)?;
+    response.response_code = ResponseCode::KeyExchange;
+    response.param1 = KeyExchangeResponse::NO_HEARTBEAT;
+    // Zero reserved field.
+    response.param2 = 0;
+    response.resp_session_id = half_session_id;
+    response.mut_auth_requested = KeyExchangeResponse::NO_ENCAPSULATE;
+    response.slot_id_param = KeyExchangeResponse::PROVISIONED_SLOT_ID;
+    C::random_bytes(response.random_data.as_mut().into())?;
+    response.exchange_data = public_key.clone();
+    response.opaque_data_size = 0.into();
+    Ok(response)
 }
 
-impl<D: SpdmDeps> KeyExchangeDispatcher for Spdm<D> {
+impl<D: ResponderDeps> KeyExchangeDispatcher for Responder<D> {
     fn dispatch_key_exchange_request(
         &mut self,
         buf: &mut [u8],
@@ -80,45 +78,54 @@ impl<D: SpdmDeps> KeyExchangeDispatcher for Spdm<D> {
         // Just 2 bytes, zero-init it to save complicated casting.
         let mut my_half_session_id = HalfSessionId::default();
         D::Crypto::random_bytes(my_half_session_id.as_mut().into())?;
-        self.set_session_id(request.req_session_id, my_half_session_id);
+        self.session
+            .set_session_id(request.req_session_id, my_half_session_id);
 
         // Perform ECDHE using the request field.
         let mut my_public_key = MaybeUninit::<EcP256UncompressedPoint>::uninit();
-        let my_public_key =
-            self.generate_handshake_secret(&request.exchange_data, &mut my_public_key)?;
+        let my_public_key = self
+            .session
+            .generate_handshake_secret(&request.exchange_data, &mut my_public_key)?;
 
         // We've read all fields we need in the request, extend the hash then we
         // can start writing to the response.
-        self.init_transcript_hash_with_key_exchange_request(request.as_bytes())?;
+        self.session
+            .init_transcript_hash_with_key_exchange_request(request.as_bytes())?;
 
-        let response = KeyExchangeResponse::write_partial_response::<D::Crypto>(
+        let response = write_partial_response::<D::Crypto>(
             &mut buf[..KeyExchangeResponse::SIZE],
             my_half_session_id,
             my_public_key,
         )?;
-        self.extend_transcript_hash_with_key_exchange_response(
-            &response.as_bytes()[..KeyExchangeResponse::PARTIAL_SIZE],
-        )?;
+        self.session
+            .extend_transcript_hash_with_key_exchange_response(
+                &response.as_bytes()[..KeyExchangeResponse::PARTIAL_SIZE],
+            )?;
 
         // Add the signature and HMAC.
-        self.sign_key_exchange_message(&mut response.signature)?;
-        self.hmac_key_exchange_message(&mut response.responder_verify_data)?;
+        self.session.sign_key_exchange_message(
+            self.identity.identity_private_key_handle(),
+            &mut response.signature,
+        )?;
+        self.session
+            .hmac_key_exchange_message(&mut response.responder_verify_data)?;
 
         // Advance state.
-        self.state = SpdmState::WaitForRequesterKey;
+        self.state = ResponderState::WaitForRequesterKey;
         Ok(KeyExchangeResponse::SIZE)
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use spdm::types::code::RequestCode;
+    use spdm_test_deps::{TestIdentity, TestVendor};
     use spdm_types::crypto::EC_P256_COORD_SIZE;
 
     use super::*;
-    use crate::deps::{SpdmTestDeps, TestIdentity, TestVendor};
     use crate::dispatch::wait_for_key_exchange::get_version::GetVersionDispatcher;
-    use crate::types::code::RequestCode;
-    use crate::types::version::SPDM_THIS_VERSION;
+    use crate::test::TestResponderDeps;
+    use crate::version::SPDM_THIS_VERSION;
 
     fn get_valid_key_exchange_buffer() -> Vec<u8> {
         let public_key = EcP256UncompressedPoint {
@@ -146,7 +153,7 @@ mod tests {
         let mut buf = get_valid_key_exchange_buffer();
         let req_size = KeyExchangeRequest::SIZE;
 
-        let mut spdm = Spdm::<SpdmTestDeps>::new(TestIdentity, TestVendor);
+        let mut spdm = Responder::<TestResponderDeps>::new(TestIdentity, TestVendor);
 
         // A GetVersion request must come first to initialize the transcript.
         let mut get_version = [0x10, RequestCode::GetVersion.0, 0, 0, 0, 0, 0, 0];
@@ -165,7 +172,7 @@ mod tests {
             KeyExchangeResponse::NO_ENCAPSULATE
         );
         assert_eq!(response.opaque_data_size.get(), 0);
-        assert!(matches!(spdm.state, SpdmState::WaitForRequesterKey));
+        assert!(matches!(spdm.state, ResponderState::WaitForRequesterKey));
     }
 
     #[test]
@@ -173,10 +180,10 @@ mod tests {
         let mut buf = get_valid_key_exchange_buffer();
         let req_size = KeyExchangeRequest::SIZE;
 
-        let mut spdm = Spdm::<SpdmTestDeps>::new(TestIdentity, TestVendor);
+        let mut spdm = Responder::<TestResponderDeps>::new(TestIdentity, TestVendor);
 
         let result = spdm.dispatch_key_exchange_request(&mut buf, req_size);
         assert_eq!(result, Err(ErrorCode::UnexpectedRequest));
-        assert!(matches!(spdm.state, SpdmState::WaitForKeyExchange));
+        assert!(matches!(spdm.state, ResponderState::WaitForKeyExchange));
     }
 }

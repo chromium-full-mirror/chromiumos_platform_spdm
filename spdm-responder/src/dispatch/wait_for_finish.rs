@@ -2,21 +2,20 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use spdm_types::deps::SpdmDeps;
+use spdm::types::code::{RequestCode, ResponseCode};
+use spdm::types::error::{ErrorCode, SpdmResult};
+use spdm::types::message::FinishRequest;
 use zerocopy::AsBytes;
 
-use super::internal::SpdmState;
-use crate::session::SpdmSessionManager;
-use crate::types::code::{RequestCode, ResponseCode};
-use crate::types::error::{ErrorCode, SpdmResult};
-use crate::types::message::FinishRequest;
-use crate::Spdm;
+use super::internal::ResponderState;
+use crate::session::ResponderSession;
+use crate::{Responder, ResponderDeps};
 
 /// WaitForFinishDispatcher handles the state where the responder is waiting
 /// for the requester to send the Finish request. After processing Finish
 /// request successfully, the session is successfully established.
 ///
-/// This trait is only used for separating impl blocks of `Spdm` struct by functionality.
+/// This trait is only used for separating impl blocks of `Responder` struct by functionality.
 pub trait WaitForFinishDispatcher {
     fn dispatch_request_wait_for_finish(
         &mut self,
@@ -28,7 +27,7 @@ pub trait WaitForFinishDispatcher {
 
 /// FinishDispatcher handles the Finish request.
 ///
-/// This trait is only used for separating impl blocks of `Spdm` struct by functionality.
+/// This trait is only used for separating impl blocks of `Responder` struct by functionality.
 pub trait FinishDispatcher {
     /// Handles the Finish request and if successful, writes the Finish response to `buf`.
     /// Finish request format: see `FinishRequest` struct.
@@ -42,7 +41,7 @@ pub trait FinishDispatcher {
     fn dispatch_finish_request(&mut self, buf: &mut [u8], req_size: usize) -> SpdmResult<usize>;
 }
 
-impl<D: SpdmDeps> FinishDispatcher for Spdm<D> {
+impl<D: ResponderDeps> FinishDispatcher for Responder<D> {
     fn dispatch_finish_request(&mut self, buf: &mut [u8], req_size: usize) -> SpdmResult<usize> {
         if req_size != FinishRequest::SIZE {
             return Err(ErrorCode::InvalidRequest);
@@ -51,23 +50,24 @@ impl<D: SpdmDeps> FinishDispatcher for Spdm<D> {
             .try_into()
             .map_err(|_| ErrorCode::Unspecified)?;
 
-        self.extend_transcript_hash_with_finish_request(
+        self.session.extend_transcript_hash_with_finish_request(
             &request.as_bytes()[..FinishRequest::PARTIAL_SIZE],
         )?;
-        self.verify_finish_message(&request.signature)?;
-        self.validate_finish_message_hmac(&request.requester_verify_data)?;
+        self.session.verify_finish_message(&request.signature)?;
+        self.session
+            .validate_finish_message_hmac(&request.requester_verify_data)?;
 
         buf[1] = ResponseCode::Finish.0;
         buf[2] = 0;
         buf[3] = 0;
 
         // Advance state.
-        self.state = SpdmState::SessionEstablished;
+        self.state = ResponderState::SessionEstablished;
         Ok(4)
     }
 }
 
-impl<D: SpdmDeps> WaitForFinishDispatcher for Spdm<D> {
+impl<D: ResponderDeps> WaitForFinishDispatcher for Responder<D> {
     fn dispatch_request_wait_for_finish(
         &mut self,
         buf: &mut [u8],
@@ -86,21 +86,24 @@ mod tests {
     #[cfg(feature = "mock")]
     mod mock {
         use mocktopus::mocking::{MockResult, Mockable};
+        use spdm::session::Session;
+        use spdm_test_deps::{TestCrypto, TestIdentity, TestVendor};
 
         use super::super::*;
-        use crate::deps::{SpdmTestDeps, TestIdentity, TestVendor};
+        use crate::session::ResponderSession;
+        use crate::test::TestResponderDeps;
 
         #[test]
         fn finish_request() {
             let mut buf = [0; FinishRequest::SIZE];
-            Spdm::<SpdmTestDeps>::extend_transcript_hash_with_finish_request
+            Session::<TestCrypto>::extend_transcript_hash_with_finish_request
                 .mock_safe(|_, _| MockResult::Return(Ok(())));
-            Spdm::<SpdmTestDeps>::verify_finish_message
+            Session::<TestCrypto>::verify_finish_message
                 .mock_safe(|_, _| MockResult::Return(Ok(())));
-            Spdm::<SpdmTestDeps>::validate_finish_message_hmac
+            Session::<TestCrypto>::validate_finish_message_hmac
                 .mock_safe(|_, _| MockResult::Return(Ok(())));
 
-            let mut spdm = Spdm::<SpdmTestDeps>::new(TestIdentity, TestVendor);
+            let mut spdm = Responder::<TestResponderDeps>::new(TestIdentity, TestVendor);
             let result = spdm.dispatch_finish_request(&mut buf, FinishRequest::SIZE);
             assert_eq!(result, Ok(4));
         }

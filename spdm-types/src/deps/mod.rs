@@ -12,11 +12,3 @@ mod vendor;
 pub use crypto::*;
 pub use identity::*;
 pub use vendor::*;
-
-/// `SpdmDeps` defines the trait dependencies of `Spdm` so it only needs
-/// to be generic on a single type with `SpdmDeps` trait bound.
-pub trait SpdmDeps {
-    type Crypto: Crypto;
-    type Identity: Identity<Crypto = Self::Crypto>;
-    type Vendor: Vendor;
-}

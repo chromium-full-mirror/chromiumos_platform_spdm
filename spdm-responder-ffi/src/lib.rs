@@ -9,8 +9,8 @@ mod deps;
 
 use core::mem::size_of;
 
-use deps::{EalIdentity, EalVendor, SpdmEalDeps};
-use spdm::{Spdm, SpdmDispatcher};
+use deps::{EalIdentity, EalResponderDeps, EalVendor};
+use spdm_responder::{Dispatcher, Responder};
 
 #[cfg(not(feature = "std"))]
 #[panic_handler]
@@ -18,12 +18,12 @@ fn panic(_info: &core::panic::PanicInfo) -> ! {
     loop {}
 }
 
-/// FFI-safe type for holding the actual Spdm struct. The size of this struct
-/// must be larger than `Spdm<SpdmEalDeps>`, such that its pointer is safe to be
-/// casted as that of `Spdm<SpdmEalDeps>`.
+/// FFI-safe type for holding the actual Responder struct. The size of this struct
+/// must be larger than `Responder<EalResponderDeps>`, such that its pointer is
+///  safe to be casted as that of `Responder<EalResponderDeps>`.
 #[repr(C)]
 pub struct SpdmFFI {
-    opaque: [u8; size_of::<Spdm<SpdmEalDeps>>()],
+    opaque: [u8; size_of::<Responder<EalResponderDeps>>()],
 }
 
 /// # Safety
@@ -32,8 +32,8 @@ pub struct SpdmFFI {
 /// Initializes the data pointed by `spdm` to a valid, clean, `SpdmFFI` structure.
 #[no_mangle]
 pub unsafe extern "C" fn spdm_initialize(spdm: *mut SpdmFFI) {
-    let spdm: &mut Spdm<SpdmEalDeps> = &mut *spdm.cast();
-    *spdm = Spdm::<SpdmEalDeps>::new(EalIdentity, EalVendor);
+    let spdm: &mut Responder<EalResponderDeps> = &mut *spdm.cast();
+    *spdm = Responder::<EalResponderDeps>::new(EalIdentity, EalVendor);
 }
 
 /// # Safety
@@ -57,7 +57,7 @@ pub unsafe extern "C" fn dispatch_spdm_request(
     req_size: usize,
     resp_size: *mut usize,
 ) {
-    let spdm: &mut Spdm<SpdmEalDeps> = &mut *(spdm.cast());
+    let spdm: &mut Responder<EalResponderDeps> = &mut *(spdm.cast());
     let buf = core::slice::from_raw_parts_mut(buf, *resp_size);
     *resp_size = spdm.dispatch_request(is_secure, buf, req_size);
 }

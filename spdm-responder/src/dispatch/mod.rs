@@ -10,15 +10,14 @@ mod wait_for_finish;
 mod wait_for_key_exchange;
 mod wait_for_requester_key;
 
-use spdm_types::deps::SpdmDeps;
-
-use self::internal::SpdmInternalDispatcher;
-use crate::Spdm;
+use self::internal::InternalDispatcher;
+use crate::error::error_response;
+use crate::{Responder, ResponderDeps};
 
 /// Defines the methods related to dispatching a request.
 ///
 /// This is the only trait exposed to the library users.
-pub trait SpdmDispatcher {
+pub trait Dispatcher {
     /// Dispatches an SPDM request to the state machine.
     ///
     /// - `is_secure` should be set to whether the request is secured (plaintext message if not).
@@ -29,7 +28,7 @@ pub trait SpdmDispatcher {
     fn dispatch_request(&mut self, is_secure: bool, buf: &mut [u8], req_size: usize) -> usize;
 }
 
-impl<D: SpdmDeps> SpdmDispatcher for Spdm<D> {
+impl<D: ResponderDeps> Dispatcher for Responder<D> {
     fn dispatch_request(&mut self, is_secure: bool, buf: &mut [u8], req_size: usize) -> usize {
         let result = if is_secure {
             self.dispatch_secure_request(buf, req_size)
@@ -38,7 +37,7 @@ impl<D: SpdmDeps> SpdmDispatcher for Spdm<D> {
         };
         match result {
             Ok(resp_size) => resp_size,
-            Err(err) => err.write_response(buf),
+            Err(err) => error_response(buf, err),
         }
     }
 }

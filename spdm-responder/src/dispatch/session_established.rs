@@ -2,11 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use spdm_types::deps::{SpdmDeps, Vendor};
+use spdm::types::code::{RequestCode, ResponseCode};
+use spdm::types::error::{ErrorCode, SpdmResult};
+use spdm_types::deps::Vendor;
 
-use crate::types::code::{RequestCode, ResponseCode};
-use crate::types::error::{ErrorCode, SpdmResult};
-use crate::Spdm;
+use crate::{Responder, ResponderDeps};
 
 ///
 /// VendorCommand request format:
@@ -33,7 +33,7 @@ const VENDOR_COMMAND_CODE_OFFSET: usize = 1;
 /// SessionEstablishedDispatcher handles the state where the session is successfully
 /// established. Only vendor commands will be processed in this phase.
 ///
-/// This trait is only used for separating impl blocks of `Spdm` struct by functionality.
+/// This trait is only used for separating impl blocks of `Responder` struct by functionality.
 pub trait SessionEstablishedDispatcher {
     fn dispatch_request_session_established(
         &mut self,
@@ -45,7 +45,7 @@ pub trait SessionEstablishedDispatcher {
 
 /// VendorCommandDispatcher handles the VendorCommand request.
 ///
-/// This trait is only used for separating impl blocks of `Spdm` struct by functionality.
+/// This trait is only used for separating impl blocks of `Responder` struct by functionality.
 pub trait VendorCommandDispatcher {
     /// Handles the VendorCommand request and if successful, writes the VendorCommand response
     /// to `buf`.
@@ -58,7 +58,7 @@ pub trait VendorCommandDispatcher {
     ) -> SpdmResult<usize>;
 }
 
-impl<D: SpdmDeps> VendorCommandDispatcher for Spdm<D> {
+impl<D: ResponderDeps> VendorCommandDispatcher for Responder<D> {
     fn dispatch_vendor_command_request(
         &mut self,
         buf: &mut [u8],
@@ -76,7 +76,7 @@ impl<D: SpdmDeps> VendorCommandDispatcher for Spdm<D> {
     }
 }
 
-impl<D: SpdmDeps> SessionEstablishedDispatcher for Spdm<D> {
+impl<D: ResponderDeps> SessionEstablishedDispatcher for Responder<D> {
     fn dispatch_request_session_established(
         &mut self,
         buf: &mut [u8],
@@ -92,10 +92,12 @@ impl<D: SpdmDeps> SessionEstablishedDispatcher for Spdm<D> {
 
 #[cfg(test)]
 mod tests {
+    use spdm::types::code::RequestCode;
+    use spdm_test_deps::{TestIdentity, TestVendor};
+
     use super::*;
-    use crate::deps::{SpdmTestDeps, TestIdentity, TestVendor};
-    use crate::types::code::RequestCode;
-    use crate::types::version::SPDM_THIS_VERSION;
+    use crate::test::TestResponderDeps;
+    use crate::version::SPDM_THIS_VERSION;
 
     #[test]
     fn give_pub_key_request() {
@@ -111,7 +113,7 @@ mod tests {
         ];
         let req_size = 8;
 
-        let mut spdm = Spdm::<SpdmTestDeps>::new(TestIdentity, TestVendor);
+        let mut spdm = Responder::<TestResponderDeps>::new(TestIdentity, TestVendor);
 
         let result = spdm.dispatch_vendor_command_request(&mut buf, req_size);
         assert_eq!(result, Ok(8));

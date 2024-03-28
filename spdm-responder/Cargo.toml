@@ -1,0 +1,26 @@
+[package]
+name = "spdm_responder"
+version = "0.1.0"
+authors = ["The ChromiumOS Authors"]
+edition = "2021"
+
+[lib]
+name = "spdm_responder"
+
+[dependencies]
+spdm = { path = "../spdm-core" }
+spdm_types = { path = "../spdm-types" }
+open-enum = "0.3.0"
+zerocopy = "0.6.1"
+uninit = { version = "0.5", default-features = false }
+
+[dev-dependencies]
+mocktopus = "0.8.0" # ignored unless use.spdm_unstable_tests by ebuild
+spdm_test_deps = { path = "../test-deps" }
+
+
+[features]
+# The mocktopus dependencies are only used when this feature is active because
+# CrOS ebuild doesn't support unstable rust features used by mocktopus by
+# default.
+mock = [ "spdm_test_deps/mock" ]

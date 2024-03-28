@@ -6,20 +6,19 @@ mod get_pub_key;
 mod get_version;
 mod key_exchange;
 
-use spdm_types::deps::SpdmDeps;
+use spdm::types::code::RequestCode;
+use spdm::types::error::{ErrorCode, SpdmResult};
 
 use self::get_pub_key::GetPubKeyDispatcher;
 use self::get_version::GetVersionDispatcher;
 use self::key_exchange::KeyExchangeDispatcher;
-use crate::types::code::RequestCode;
-use crate::types::error::{ErrorCode, SpdmResult};
-use crate::Spdm;
+use crate::{Responder, ResponderDeps};
 
 /// WaitForKeyExchangeDispatcher handles the state where the responder hasn't received
 /// a KeyExchange to start establishing the session. After processing KeyExchange
 /// request successfully, the state handler should advance to the next state.
 ///
-/// This trait is only used for separating impl blocks of `Spdm` struct by functionality.
+/// This trait is only used for separating impl blocks of `Responder` struct by functionality.
 pub trait WaitForKeyExchangeDispatcher {
     fn dispatch_request_wait_for_key_exchange(
         &mut self,
@@ -29,7 +28,7 @@ pub trait WaitForKeyExchangeDispatcher {
     ) -> SpdmResult<usize>;
 }
 
-impl<D: SpdmDeps> WaitForKeyExchangeDispatcher for Spdm<D> {
+impl<D: ResponderDeps> WaitForKeyExchangeDispatcher for Responder<D> {
     fn dispatch_request_wait_for_key_exchange(
         &mut self,
         buf: &mut [u8],

@@ -2,18 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use spdm_types::deps::SpdmDeps;
+use spdm::types::code::ResponseCode;
+use spdm::types::error::{ErrorCode, SpdmResult};
+use spdm::types::message::{GET_VERSION_REQUEST_SIZE, VERSION_RESPONSE_SIZE};
 
-use crate::session::SpdmSessionManager;
-use crate::types::code::ResponseCode;
-use crate::types::error::{ErrorCode, SpdmResult};
-use crate::types::message::{GET_VERSION_REQUEST_SIZE, VERSION_RESPONSE_SIZE};
-use crate::types::version::{SPDM_THIS_ALPHA_VERSION, SPDM_THIS_VERSION};
-use crate::Spdm;
+use crate::version::{SPDM_THIS_ALPHA_VERSION, SPDM_THIS_VERSION};
+use crate::{Responder, ResponderDeps};
 
 /// GetVersionDispatcher handles the GetVersion request.
 ///
-/// This trait is only used for separating impl blocks of `Spdm` struct by functionality.
+/// This trait is only used for separating impl blocks of `Responder` struct by functionality.
 pub trait GetVersionDispatcher {
     /// Version response format:
     ///
@@ -32,7 +30,7 @@ pub trait GetVersionDispatcher {
     ) -> SpdmResult<usize>;
 }
 
-impl<D: SpdmDeps> GetVersionDispatcher for Spdm<D> {
+impl<D: ResponderDeps> GetVersionDispatcher for Responder<D> {
     fn dispatch_get_version_request(
         &mut self,
         buf: &mut [u8],
@@ -56,7 +54,7 @@ impl<D: SpdmDeps> GetVersionDispatcher for Spdm<D> {
         buf[6] = SPDM_THIS_VERSION;
         buf[7] = SPDM_THIS_ALPHA_VERSION;
 
-        self.set_negotiation_transcript(
+        self.session.set_negotiation_transcript(
             get_version_request,
             buf[..VERSION_RESPONSE_SIZE].try_into().unwrap(),
         );
@@ -67,17 +65,19 @@ impl<D: SpdmDeps> GetVersionDispatcher for Spdm<D> {
 
 #[cfg(test)]
 mod tests {
+    use spdm::types::code::RequestCode;
+    use spdm_test_deps::{TestIdentity, TestVendor};
+
     use super::*;
-    use crate::deps::{SpdmTestDeps, TestIdentity, TestVendor};
-    use crate::dispatch::internal::SpdmState;
-    use crate::types::code::RequestCode;
+    use crate::dispatch::internal::ResponderState;
+    use crate::test::TestResponderDeps;
 
     #[test]
     fn get_version_request() {
         let mut buf = [0x10, RequestCode::GetVersion.0, 0, 0, 0, 0, 0, 0];
         let req_size = 4;
 
-        let mut spdm = Spdm::<SpdmTestDeps>::new(TestIdentity, TestVendor);
+        let mut spdm = Responder::<TestResponderDeps>::new(TestIdentity, TestVendor);
 
         let result = spdm.dispatch_get_version_request(&mut buf, req_size);
         assert_eq!(result, Ok(8));
@@ -111,6 +111,6 @@ mod tests {
                 SPDM_THIS_ALPHA_VERSION
             ])
         );
-        assert!(matches!(spdm.state, SpdmState::WaitForKeyExchange));
+        assert!(matches!(spdm.state, ResponderState::WaitForKeyExchange));
     }
 }
