@@ -6,9 +6,11 @@
 //! needs to define concret instances of the SPDM dependency traits.
 
 mod crypto;
+mod dispatch;
 mod identity;
 mod vendor;
 
 pub use crypto::*;
+pub use dispatch::*;
 pub use identity::*;
 pub use vendor::*;

@@ -2,6 +2,7 @@
 members = [
   "spdm-core",
   "spdm-proc-macros",
+  "spdm-requester",
   "spdm-responder-ffi",
   "spdm-responder",
   "spdm-types",
@@ -10,6 +11,7 @@ members = [
 default-members = [
   "spdm-core",
   "spdm-proc-macros",
+  "spdm-requester",
   "spdm-responder-ffi",
   "spdm-responder",
   "spdm-types",

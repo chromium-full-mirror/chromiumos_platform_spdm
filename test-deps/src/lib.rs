@@ -6,9 +6,11 @@
 
 #![cfg_attr(not(test), no_std)]
 mod crypto;
+mod dispatch;
 mod identity;
 mod vendor;
 
 pub use crypto::*;
+pub use dispatch::*;
 pub use identity::*;
 pub use vendor::*;
