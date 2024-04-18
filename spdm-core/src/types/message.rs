@@ -61,6 +61,22 @@ macro_rules! try_from_mut_u8_arr {
     };
 }
 
+// GetPubKey related types.
+
+#[repr(C, packed)]
+#[derive(FromBytes, AsBytes, Unaligned)]
+pub struct GetPubKeyResponse {
+    pub version: SpdmVersion,
+    pub request_code: RequestCode,
+    /// Reserved.
+    pub param1: Param1,
+    /// Reserved.
+    pub param2: Param2,
+    /// Responder identity public key.
+    pub public_key: IdentityPublicKey,
+}
+try_from_u8_arr!(GetPubKeyResponse);
+
 // KeyExchange related types.
 
 pub type SessionPolicy = u8;

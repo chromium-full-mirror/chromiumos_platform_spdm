@@ -35,9 +35,7 @@ impl<D: RequesterDeps> GetVersionSender for Requester<D> {
 
         // [SPDMVersion, RequestCode, Reserved, Reserved]
         const GET_VERSION_REQUEST: [u8; 4] = [0x10, RequestCode::GetVersion.0, 0, 0];
-        buf[0..4]
-            .as_out()
-            .copy_from_slice(&[0x10, RequestCode::GetVersion.0, 0, 0]);
+        buf[0..4].as_out().copy_from_slice(&GET_VERSION_REQUEST);
         let resp = self.dispatch.dispatch_request(false, buf.as_out(), 4);
         if resp.len() != VERSION_RESPONSE_SIZE {
             return Err(RequesterError);

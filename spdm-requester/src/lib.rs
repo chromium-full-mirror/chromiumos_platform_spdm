@@ -14,6 +14,7 @@ mod establish;
 mod version;
 
 use error::{RequesterError, RequesterStatus};
+use establish::get_public_key::GetPubKeySender;
 use establish::get_version::GetVersionSender;
 use spdm::session::Session;
 use spdm_types::deps::{Crypto, Dispatch, Identity};
@@ -48,6 +49,8 @@ impl<D: RequesterDeps> Requester<D> {
     pub fn establish_session(&mut self) -> RequesterStatus {
         self.session.reset_session();
         self.get_version()?;
+        self.get_pub_key()?;
+
         // TODO(b/335386464): Implement rest of the session establishment.
         Err(RequesterError)
     }

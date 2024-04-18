@@ -4,6 +4,7 @@
 
 use core::mem::size_of;
 
+use spdm_proc_macros::cfg_host_attr;
 use zerocopy::{AsBytes, FromBytes};
 
 /// Elliptic curve NIST P-256 coordinate point size in bytes
@@ -20,6 +21,7 @@ pub type EcP256Coord = [u8; EC_P256_COORD_SIZE];
 pub type EcdsaP256Scalar = [u8; ECDSA_P256_SCALAR_SIZE];
 
 #[repr(C, packed)]
+#[cfg_host_attr(derive(Debug, PartialEq, Eq))]
 #[derive(AsBytes, FromBytes, Clone)]
 pub struct EcP256UncompressedPoint {
     pub x: EcP256Coord,
