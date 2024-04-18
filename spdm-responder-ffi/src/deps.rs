@@ -75,6 +75,15 @@ impl Crypto for EalCrypto {
         unimplemented!()
     }
 
+    fn hmac_extract_from_ecdh_with_priv<'a>(
+        _their_public_key: &EcP256UncompressedPoint,
+        _my_private_key: &Self::IdentityPrivateKeyHandle,
+        _salt: &[u8],
+        _hmac_derivation_key_handle: Out<'a, Self::HmacDerivationKeyHandle>,
+    ) -> CryptoResult<&'a mut Self::HmacDerivationKeyHandle> {
+        unimplemented!()
+    }
+
     fn hmac_expand_hmac_secret_key<'a>(
         _hmac_derivation_key_handle: &Self::HmacDerivationKeyHandle,
         _info: &[u8],
@@ -144,6 +153,16 @@ impl Crypto for EalCrypto {
     }
 
     fn random_bytes(_buf: Out<[u8]>) -> CryptoResult<&mut [u8]> {
+        unimplemented!()
+    }
+
+    fn random_key_pair<'a>(
+        _private: Out<'a, Self::IdentityPrivateKeyHandle>,
+        _public: Out<'a, IdentityPublicKey>,
+    ) -> CryptoResult<(
+        &'a mut Self::IdentityPrivateKeyHandle,
+        &'a mut IdentityPublicKey,
+    )> {
         unimplemented!()
     }
 }

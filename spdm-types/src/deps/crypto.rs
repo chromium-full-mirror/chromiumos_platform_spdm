@@ -92,6 +92,17 @@ pub trait Crypto {
         &'a mut EcP256UncompressedPoint,
         &'b mut Self::HmacDerivationKeyHandle,
     )>;
+    /// Perform HMAC extract from using `salt` and the shared secret produced by ECDH (P-256).
+    /// ECDH is performed using `their_public_key`, and `my_private_key` will be produced. HMAC
+    /// extract is only 1 of the 2 steps that need to be performed for a full HKDF, but in SPDM
+    /// we separate the 2 steps because SPDM spec reuses the intermediate key to expand into
+    /// several other keys.
+    fn hmac_extract_from_ecdh_with_priv<'a>(
+        their_public_key: &EcP256UncompressedPoint,
+        my_private_key: &Self::IdentityPrivateKeyHandle,
+        salt: &[u8],
+        hmac_derivation_key_handle: Out<'a, Self::HmacDerivationKeyHandle>,
+    ) -> CryptoResult<&'a mut Self::HmacDerivationKeyHandle>;
     /// Perform HMAC expand from using `hmac_derivation_key_handle` and `info`. HMAC
     /// expand uses a secret value as the HMAC key and info as the data to produce
     /// another secret value, pointed by `hmac_secret_key_handle`. It is equivalent
@@ -157,4 +168,12 @@ pub trait Crypto {
     // Misc.
     /// Fill `buf` with random bytes.
     fn random_bytes(buf: Out<[u8]>) -> CryptoResult<&mut [u8]>;
+    /// Randomly generate a valid P256 EC key pair.
+    fn random_key_pair<'a>(
+        private: Out<'a, Self::IdentityPrivateKeyHandle>,
+        public: Out<'a, IdentityPublicKey>,
+    ) -> CryptoResult<(
+        &'a mut Self::IdentityPrivateKeyHandle,
+        &'a mut IdentityPublicKey,
+    )>;
 }

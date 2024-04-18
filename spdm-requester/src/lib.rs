@@ -11,11 +11,13 @@ mod test;
 
 mod error;
 mod establish;
+mod session;
 mod version;
 
 use error::{RequesterError, RequesterStatus};
 use establish::get_public_key::GetPubKeySender;
 use establish::get_version::GetVersionSender;
+use establish::key_exchange::KeyExchangeSender;
 use spdm::session::Session;
 use spdm_types::deps::{Crypto, Dispatch, Identity};
 
@@ -50,6 +52,7 @@ impl<D: RequesterDeps> Requester<D> {
         self.session.reset_session();
         self.get_version()?;
         self.get_pub_key()?;
+        self.key_exchange()?;
 
         // TODO(b/335386464): Implement rest of the session establishment.
         Err(RequesterError)

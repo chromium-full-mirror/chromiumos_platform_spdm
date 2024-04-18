@@ -8,14 +8,12 @@ pub mod sign;
 
 #[cfg(feature = "mock")]
 use mocktopus::macros::*;
-use spdm_types::crypto::{
-    EcP256UncompressedPoint, EcdsaP256Signature, Sha256Hash, SHA256_HASH_SIZE,
-};
+use spdm_types::crypto::{EcdsaP256Signature, Sha256Hash, SHA256_HASH_SIZE};
 use spdm_types::deps::{Crypto, IdentityPublicKey};
 use uninit::prelude::*;
 use zerocopy::AsBytes;
 
-use crate::types::error::{ErrorCode, SpdmResult, SpdmStatus};
+use crate::types::error::{ErrorCode, SpdmStatus};
 use crate::types::message::{
     HalfSessionId, SequenceNumber, SessionId, GET_VERSION_REQUEST_SIZE, VERSION_RESPONSE_SIZE,
 };
@@ -138,26 +136,6 @@ impl<C: Crypto> Session<C> {
     // Set the responder public key.
     pub fn set_responder_public_key(&mut self, public_key: &IdentityPublicKey) {
         self.responder_public_key = Some(public_key.clone());
-    }
-
-    // Perform ECDHE, return the resulting public key, and store the generated derivation key.
-    pub fn generate_handshake_secret<'a>(
-        &mut self,
-        their_public_key: &EcP256UncompressedPoint,
-        my_public_key: &'a mut MaybeUninit<EcP256UncompressedPoint>,
-    ) -> SpdmResult<&'a mut EcP256UncompressedPoint> {
-        const SALT_0: [u8; SHA256_HASH_SIZE] = [0; SHA256_HASH_SIZE];
-        let mut handle = MaybeUninit::<C::HmacDerivationKeyHandle>::uninit();
-        let (my_public_key, _) = C::hmac_extract_from_ecdh(
-            their_public_key,
-            &SALT_0,
-            my_public_key.as_out(),
-            (&mut handle).into(),
-        )?;
-        // SAFETY: `handle` is guaranteed to be initialized after a successful
-        // `hmac_extract_from_ecdh`.
-        self.handshake_secret = unsafe { Some(handle.assume_init()) };
-        Ok(my_public_key)
     }
 
     // Transcript hash related helper functions.

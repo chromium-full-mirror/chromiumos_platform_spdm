@@ -88,13 +88,13 @@ pub type SlotIdParam = u8;
 pub struct KeyExchangeRequest {
     pub version: SpdmVersion,
     pub request_code: RequestCode,
-    /// Type of measurements requested. We ignore this field.
+    /// Type of measurements requested. Should be 0.
     pub param1: Param1,
-    /// SlotID requested. We ignore this field.
+    /// SlotID requested. Should be 0xFF.
     pub param2: Param2,
     /// 2-byte half of session ID.
     pub req_session_id: HalfSessionId,
-    /// Session policy requested. We ignore this field.
+    /// Session policy requested. Should be 0.
     pub session_policy: SessionPolicy,
     pub reserved: u8,
     /// Random data - just to provide entropy to the request, which is used
@@ -142,6 +142,7 @@ pub struct KeyExchangeResponse {
     /// HMAC of the transcript hash TH1 using the established session key.
     pub responder_verify_data: Sha256Hash,
 }
+try_from_u8_arr!(KeyExchangeResponse);
 try_from_mut_u8_arr!(KeyExchangeResponse);
 
 impl KeyExchangeResponse {

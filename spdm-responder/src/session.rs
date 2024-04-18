@@ -9,13 +9,22 @@ use spdm::session::key_schedule::{
 };
 use spdm::session::sign::{make_message_to_sign_for_finish, make_message_to_sign_for_key_exchange};
 use spdm::session::{Session, SessionPhase, SpdmRole};
-use spdm::types::error::{ErrorCode, SpdmStatus};
-use spdm_types::crypto::{EcdsaP256Signature, Sha256Hash};
+use spdm::types::error::{ErrorCode, SpdmResult, SpdmStatus};
+use spdm_types::crypto::{
+    EcP256UncompressedPoint, EcdsaP256Signature, Sha256Hash, SHA256_HASH_SIZE,
+};
 use spdm_types::deps::Crypto;
 use uninit::prelude::*;
 
 // Provide some extra responder-only utils to the Session struct.
 pub trait ResponderSession<C: Crypto> {
+    // Perform ECDHE, return the resulting public key, and store the generated derivation key.
+    fn generate_handshake_secret<'a>(
+        &mut self,
+        their_public_key: &EcP256UncompressedPoint,
+        my_public_key: &'a mut MaybeUninit<EcP256UncompressedPoint>,
+    ) -> SpdmResult<&'a mut EcP256UncompressedPoint>;
+
     /// Signs the key exchange message.
     fn sign_key_exchange_message(
         &mut self,
@@ -35,6 +44,25 @@ pub trait ResponderSession<C: Crypto> {
 
 #[cfg_attr(all(test, feature = "mock"), mockable)]
 impl<C: Crypto> ResponderSession<C> for Session<C> {
+    fn generate_handshake_secret<'a>(
+        &mut self,
+        their_public_key: &EcP256UncompressedPoint,
+        my_public_key: &'a mut MaybeUninit<EcP256UncompressedPoint>,
+    ) -> SpdmResult<&'a mut EcP256UncompressedPoint> {
+        const SALT_0: [u8; SHA256_HASH_SIZE] = [0; SHA256_HASH_SIZE];
+        let mut handle = MaybeUninit::<C::HmacDerivationKeyHandle>::uninit();
+        let (my_public_key, _) = C::hmac_extract_from_ecdh(
+            their_public_key,
+            &SALT_0,
+            my_public_key.as_out(),
+            (&mut handle).into(),
+        )?;
+        // SAFETY: `handle` is guaranteed to be initialized after a successful
+        // `hmac_extract_from_ecdh`.
+        self.handshake_secret = unsafe { Some(handle.assume_init()) };
+        Ok(my_public_key)
+    }
+
     fn sign_key_exchange_message(
         &mut self,
         private_key_handle: &C::IdentityPrivateKeyHandle,

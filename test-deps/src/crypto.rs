@@ -14,6 +14,8 @@ use spdm_types::crypto::{
 use spdm_types::deps::{Crypto, CryptoResult, CryptoStatus, IdentityPublicKey};
 use uninit::prelude::*;
 
+use crate::TEST_IDENTITY_PUBLIC_KEY;
+
 const TEST_HASH: [u8; SHA256_HASH_SIZE] = [0xFF; SHA256_HASH_SIZE];
 const TEST_SIGNATURE: EcdsaP256Signature = EcdsaP256Signature {
     r: [0x0A; ECDSA_P256_SCALAR_SIZE],
@@ -76,6 +78,15 @@ impl Crypto for TestCrypto {
         Ok(())
     }
 
+    fn hmac_extract_from_ecdh_with_priv<'a>(
+        _their_public_key: &EcP256UncompressedPoint,
+        _my_private_key: &Self::IdentityPrivateKeyHandle,
+        _salt: &[u8],
+        hmac_derivation_key_handle: Out<'a, Self::HmacDerivationKeyHandle>,
+    ) -> CryptoResult<&'a mut Self::HmacDerivationKeyHandle> {
+        Ok(hmac_derivation_key_handle.write(()))
+    }
+
     fn hmac_extract_from_ecdh<'a, 'b>(
         _their_public_key: &EcP256UncompressedPoint,
         _salt: &[u8],
@@ -136,7 +147,7 @@ impl Crypto for TestCrypto {
         _data: &[u8],
         _hmac: &Sha256Hash,
     ) -> CryptoStatus {
-        unimplemented!()
+        Ok(())
     }
 
     fn aes_gcm_encrypt<'a>(
@@ -161,5 +172,15 @@ impl Crypto for TestCrypto {
 
     fn random_bytes(buf: Out<[u8]>) -> CryptoResult<&mut [u8]> {
         Ok(buf.init_with(repeat(0xDD)))
+    }
+
+    fn random_key_pair<'a>(
+        private: Out<'a, Self::IdentityPrivateKeyHandle>,
+        public: Out<'a, IdentityPublicKey>,
+    ) -> CryptoResult<(
+        &'a mut Self::IdentityPrivateKeyHandle,
+        &'a mut IdentityPublicKey,
+    )> {
+        Ok((private.write(()), public.write(TEST_IDENTITY_PUBLIC_KEY)))
     }
 }
