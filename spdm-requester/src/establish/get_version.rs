@@ -69,8 +69,8 @@ mod tests {
         fn get_version_success() {
             let mut requester = Requester::<TestRequesterDeps>::new(TestIdentity, TestDispatch);
 
-            TestDispatch::dispatch_request_impl.mock_safe(|_, _, buf, _| {
-                buf.copy_from_slice(&[
+            TestDispatch::dispatch_request.mock_safe(|_, _, buf, _| {
+                MockResult::Return(buf.copy_from_slice(&[
                     0x10,
                     ResponseCode::Version.0,
                     0,
@@ -79,8 +79,7 @@ mod tests {
                     1,
                     SPDM_THIS_VERSION,
                     SPDM_THIS_ALPHA_VERSION,
-                ]);
-                MockResult::Return(8)
+                ]))
             });
 
             let result = requester.get_version();
@@ -109,8 +108,8 @@ mod tests {
         fn get_version_mismatch() {
             let mut requester = Requester::<TestRequesterDeps>::new(TestIdentity, TestDispatch);
 
-            TestDispatch::dispatch_request_impl.mock_safe(|_, _, buf, _| {
-                buf.copy_from_slice(&[
+            TestDispatch::dispatch_request.mock_safe(|_, _, buf, _| {
+                MockResult::Return(buf.copy_from_slice(&[
                     0x10,
                     ResponseCode::Version.0,
                     0,
@@ -119,8 +118,7 @@ mod tests {
                     1,
                     SPDM_THIS_VERSION,
                     SPDM_THIS_ALPHA_VERSION + 1,
-                ]);
-                MockResult::Return(8)
+                ]))
             });
 
             let result = requester.get_version();
