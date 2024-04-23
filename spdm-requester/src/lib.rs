@@ -4,11 +4,10 @@
 
 //! Implements the SPDM requester logic.
 
-#![cfg_attr(not(test), no_std)]
-
 #[cfg(test)]
 mod test;
 
+mod dispatch;
 mod error;
 mod establish;
 mod session;

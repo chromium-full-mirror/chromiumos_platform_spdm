@@ -7,13 +7,10 @@ use core::mem::MaybeUninit;
 #[cfg(all(test, feature = "mock"))]
 use mocktopus::macros::*;
 use spdm::session::aead::{decrypt_secure_message, encrypt_secure_message, REQUEST_OFFSET};
-use spdm::session::key_schedule::{
-    generate_aead_keys, generate_message_secrets, AeadSessionKeys, MessageSecrets,
-};
-use spdm::session::{Session, SessionPhase};
+use spdm::session::key_schedule::{get_session_keys, AeadSessionKeys};
+use spdm::session::SessionPhase;
 use spdm::types::code::RequestCode;
 use spdm::types::error::{ErrorCode, SpdmResult};
-use spdm_types::deps::Crypto;
 
 use super::session_established::SessionEstablishedDispatcher;
 use super::wait_for_finish::WaitForFinishDispatcher;
@@ -67,16 +64,6 @@ pub trait InternalDispatcher {
         req_size: usize,
         req_code: RequestCode,
     ) -> SpdmResult<usize>;
-}
-
-fn get_session_keys<'a, C: Crypto>(
-    session: &Session<C>,
-    phase: SessionPhase,
-    keys: &'a mut MaybeUninit<AeadSessionKeys<C>>,
-) -> SpdmResult<&'a mut AeadSessionKeys<C>> {
-    let mut message_secrets = MaybeUninit::<MessageSecrets<C>>::uninit();
-    let message_secrets = generate_message_secrets(session, phase, (&mut message_secrets).into())?;
-    generate_aead_keys(message_secrets, &session.sequence_numbers, keys.into())
 }
 
 #[cfg_attr(all(test, feature = "mock"), mockable)]
@@ -214,6 +201,7 @@ mod tests {
     mod mock {
         use mocktopus::mocking::{MockContext, MockResult};
         use spdm_test_deps::TestCrypto;
+        use spdm_types::deps::Crypto;
 
         use super::*;
 

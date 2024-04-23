@@ -5,5 +5,5 @@
 # found in the LICENSE file.
 
 cargo clippy --workspace --no-default-features --target thumbv7m-none-eabi\
-  -- -D warnings
+  --exclude spdm_requester -- -D warnings
 cargo clippy --workspace --all-targets -- -D warnings

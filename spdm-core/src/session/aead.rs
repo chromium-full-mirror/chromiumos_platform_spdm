@@ -21,7 +21,7 @@ pub const REQUEST_OFFSET: usize = 8;
 /// | Byte offset | Size (bytes) | Field               | Description          |
 /// | :---------- | :----------- | :------------------ | :------------------- |
 /// | 0           | 4            | SessionId           |                      |
-/// | 4           | 6            | Length              | Remaining msg length |
+/// | 4           | 2            | Length              | Remaining msg length |
 /// | 6           | 2            | Data length         | (Encrypted) req size |
 /// | 8           | Data length  | Data                | (Encrypted) request  |
 /// | (next)      | Random       | Random              | (Encrypted) random   |
@@ -66,7 +66,7 @@ pub fn decrypt_secure_message<C: Crypto>(
 /// | Byte offset | Size (bytes) | Field               | Description          |
 /// | :---------- | :----------- | :------------------ | :------------------- |
 /// | 0           | 4            | SessionId           |                      |
-/// | 4           | 6            | Length              | Remaining msg length |
+/// | 4           | 2            | Length              | Remaining msg length |
 /// | 6           | 2            | Data length         | (Encrypted) req size |
 /// | 8           | Data length  | Data                | (Encrypted) request  |
 /// | (next)      | Random       | Random              | (Encrypted) random   |
@@ -98,10 +98,10 @@ pub fn encrypt_secure_message<C: Crypto>(
     }
     buf[CIPHERTEXT_OFFSET..CIPHERTEXT_OFFSET + 2]
         .copy_from_slice(&(resp_size as u16).to_le_bytes());
-    let (header, body) = buf[..encrypted_resp_size].split_at_mut(REQUEST_OFFSET);
+    let (header, body) = buf[..encrypted_resp_size].split_at_mut(CIPHERTEXT_OFFSET);
     header[..4].copy_from_slice(&session_id);
     header[LENGTH_OFFSET..LENGTH_OFFSET + 2]
-        .copy_from_slice(&(encrypted_resp_size as u16 - 4).to_le_bytes());
+        .copy_from_slice(&((encrypted_resp_size - CIPHERTEXT_OFFSET) as u16).to_le_bytes());
     let (plaintext, tag) = body.split_at_mut(body.len() - AES_GCM_128_TAG_SIZE);
     let tag: &mut AesGcm128Tag = (&mut *tag).try_into().unwrap();
     C::aes_gcm_encrypt(

@@ -234,6 +234,16 @@ pub fn generate_aead_keys<'a, C: Crypto>(
     Ok(unsafe { aead_keys.assume_init() })
 }
 
+pub fn get_session_keys<'a, C: Crypto>(
+    session: &Session<C>,
+    phase: SessionPhase,
+    keys: &'a mut MaybeUninit<AeadSessionKeys<C>>,
+) -> SpdmResult<&'a mut AeadSessionKeys<C>> {
+    let mut message_secrets = MaybeUninit::<MessageSecrets<C>>::uninit();
+    let message_secrets = generate_message_secrets(session, phase, (&mut message_secrets).into())?;
+    generate_aead_keys(message_secrets, &session.sequence_numbers, keys.into())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
