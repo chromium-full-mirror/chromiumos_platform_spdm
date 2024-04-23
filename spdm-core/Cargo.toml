@@ -22,4 +22,4 @@ spdm_test_deps = { path = "../test-deps" }
 # The mocktopus dependencies are only used when this feature is active because
 # CrOS ebuild doesn't support unstable rust features used by mocktopus by
 # default.
-mock = [ "mocktopus" ]
+mock = [ "mocktopus" ] # ignored unless use.spdm_unstable_tests by ebuild
