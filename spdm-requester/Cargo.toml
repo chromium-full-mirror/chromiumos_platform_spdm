@@ -8,6 +8,7 @@ edition = "2021"
 name = "spdm_requester"
 
 [dependencies]
+spdm_proc_macros = { path = "../spdm-proc-macros" }
 spdm = { path = "../spdm-core" }
 spdm_types = { path = "../spdm-types" }
 open-enum = "0.3.0"

@@ -21,3 +21,22 @@ pub fn cfg_host(_: TokenStream, item: TokenStream) -> TokenStream {
     stream.extend(item);
     stream
 }
+
+/// Specify the mockable attribute for test-only builds with mock feature enabled
+#[proc_macro_attribute]
+pub fn cfg_test_mockable(_: TokenStream, item: TokenStream) -> TokenStream {
+    let mut stream: TokenStream = r#"#[cfg_attr(all(test, feature = "mock"), mockable)]"#
+        .parse()
+        .unwrap();
+    stream.extend(item);
+    stream
+}
+
+/// Use to compile in item test-only builds with mock feature enabled
+#[proc_macro_attribute]
+pub fn cfg_test_mock(_: TokenStream, item: TokenStream) -> TokenStream {
+    let mut stream: TokenStream =
+        r#"#[cfg(all(test, feature = "mock"))]"#.to_string().parse().unwrap();
+    stream.extend(item);
+    stream
+}

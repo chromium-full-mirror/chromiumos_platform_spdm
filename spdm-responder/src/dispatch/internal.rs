@@ -4,13 +4,14 @@
 
 use core::mem::MaybeUninit;
 
-#[cfg(all(test, feature = "mock"))]
+#[cfg_test_mock]
 use mocktopus::macros::*;
 use spdm::session::aead::{decrypt_secure_message, encrypt_secure_message, REQUEST_OFFSET};
 use spdm::session::key_schedule::{get_session_keys, AeadSessionKeys};
 use spdm::session::SessionPhase;
 use spdm::types::code::RequestCode;
 use spdm::types::error::{ErrorCode, SpdmResult};
+use spdm_proc_macros::{cfg_test_mock, cfg_test_mockable};
 
 use super::session_established::SessionEstablishedDispatcher;
 use super::wait_for_finish::WaitForFinishDispatcher;
@@ -66,7 +67,7 @@ pub trait InternalDispatcher {
     ) -> SpdmResult<usize>;
 }
 
-#[cfg_attr(all(test, feature = "mock"), mockable)]
+#[cfg_test_mockable]
 impl<D: ResponderDeps> InternalDispatcher for Responder<D> {
     fn dispatch_plaintext_request(&mut self, buf: &mut [u8], req_size: usize) -> SpdmResult<usize> {
         if buf.len() < req_size {

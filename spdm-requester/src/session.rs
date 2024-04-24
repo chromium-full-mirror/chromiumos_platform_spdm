@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#[cfg(all(test, feature = "mock"))]
+#[cfg_test_mock]
 use mocktopus::macros::*;
 use spdm::session::key_schedule::{
     generate_finished_key, generate_message_secrets, MessageSecrets,
@@ -10,6 +10,7 @@ use spdm::session::key_schedule::{
 use spdm::session::sign::make_message_to_sign_for_key_exchange;
 use spdm::session::{Session, SessionPhase, SpdmRole};
 use spdm::types::error::{ErrorCode, SpdmStatus};
+use spdm_proc_macros::{cfg_test_mock, cfg_test_mockable};
 use spdm_types::crypto::{
     EcP256UncompressedPoint, EcdsaP256Signature, Sha256Hash, SHA256_HASH_SIZE,
 };
@@ -32,7 +33,7 @@ pub trait RequesterSession<C: Crypto> {
     fn verify_key_exchange_message_hmac(&mut self, hmac: &Sha256Hash) -> SpdmStatus;
 }
 
-#[cfg_attr(all(test, feature = "mock"), mockable)]
+#[cfg_test_mockable]
 impl<C: Crypto> RequesterSession<C> for Session<C> {
     fn generate_handshake_secret(
         &mut self,
