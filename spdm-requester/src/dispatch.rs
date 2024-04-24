@@ -4,9 +4,12 @@
 
 use core::mem::MaybeUninit;
 
+#[cfg_test_mock]
+use mocktopus::macros::*;
 use spdm::session::aead::{decrypt_secure_message, encrypt_secure_message};
 use spdm::session::key_schedule::{get_session_keys, AeadSessionKeys};
 use spdm::session::SessionPhase;
+use spdm_proc_macros::{cfg_test_mock, cfg_test_mockable};
 use spdm_types::crypto::AES_GCM_128_TAG_SIZE;
 use spdm_types::deps::Dispatch;
 use uninit::extension_traits::AsOut;
@@ -18,7 +21,7 @@ use crate::{Requester, RequesterDeps};
 const REQUEST_OFFSET: usize = 8;
 const MAX_RANDOM_SIZE: usize = 16;
 
-trait DispatchSecure {
+pub trait DispatchSecure {
     // Dispatch a session-encrypted request. The encryption keys will be selected
     // based on `phase`. The plaintext request is the first `req_size` bytes of
     // `buf`. If successful, the mutable slice of the response is returned.
@@ -31,6 +34,7 @@ trait DispatchSecure {
     ) -> RequesterResult<&'a mut [u8]>;
 }
 
+#[cfg_test_mockable]
 impl<D: RequesterDeps> DispatchSecure for Requester<D> {
     fn dispatch_secure_request<'a>(
         &mut self,

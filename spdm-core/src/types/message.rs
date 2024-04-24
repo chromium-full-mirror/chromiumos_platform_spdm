@@ -19,6 +19,7 @@ pub const GET_VERSION_REQUEST_SIZE: usize = 4;
 pub const VERSION_RESPONSE_SIZE: usize = 8;
 
 pub const GET_PUBLIC_KEY_RESPONSE_SIZE: usize = 4 + IdentityPublicKey::SIZE;
+pub const GIVE_PUBLIC_KEY_RESPONSE_SIZE: usize = 4;
 
 // Session ID types: `SessionId` is combined by 2 `HalfSessionId`s, one from
 // the requester and one from the responder.

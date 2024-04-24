@@ -4,4 +4,5 @@
 
 pub mod get_public_key;
 pub mod get_version;
+pub mod give_public_key;
 pub mod key_exchange;
