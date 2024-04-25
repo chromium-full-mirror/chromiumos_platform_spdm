@@ -14,6 +14,7 @@ mod session;
 mod version;
 
 use error::{RequesterError, RequesterStatus};
+use establish::finish::FinishSender;
 use establish::get_public_key::GetPubKeySender;
 use establish::get_version::GetVersionSender;
 use establish::give_public_key::GivePubKeySender;
@@ -52,8 +53,7 @@ impl<D: RequesterDeps> Requester<D> {
         self.get_pub_key()?;
         self.key_exchange()?;
         self.give_pub_key()?;
-
-        // TODO(b/335386464): Implement rest of the session establishment.
+        self.finish()?;
         Err(RequesterError)
     }
 }

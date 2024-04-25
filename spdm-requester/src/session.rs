@@ -7,7 +7,7 @@ use mocktopus::macros::*;
 use spdm::session::key_schedule::{
     generate_finished_key, generate_message_secrets, MessageSecrets,
 };
-use spdm::session::sign::make_message_to_sign_for_key_exchange;
+use spdm::session::sign::{make_message_to_sign_for_finish, make_message_to_sign_for_key_exchange};
 use spdm::session::{Session, SessionPhase, SpdmRole};
 use spdm::types::error::{ErrorCode, SpdmStatus};
 use spdm_proc_macros::{cfg_test_mock, cfg_test_mockable};
@@ -31,6 +31,16 @@ pub trait RequesterSession<C: Crypto> {
 
     /// Verifies the key exchange message hmac.
     fn verify_key_exchange_message_hmac(&mut self, hmac: &Sha256Hash) -> SpdmStatus;
+
+    /// Signs the finish message.
+    fn sign_finish_message(
+        &mut self,
+        private_key_handle: &C::IdentityPrivateKeyHandle,
+        signature: &mut EcdsaP256Signature,
+    ) -> SpdmStatus;
+
+    /// Hmacs the finish message, including the signature part.
+    fn hmac_finish_message(&mut self, hmac: &mut Sha256Hash) -> SpdmStatus;
 }
 
 #[cfg_test_mockable]
@@ -87,6 +97,53 @@ impl<C: Crypto> RequesterSession<C> for Session<C> {
         C::validate_hmac(finished_key, th1, hmac)?;
         // Update the transcript after verifying.
         self.extend_transcript_hash_with_key_exchange_hmac(hmac)?;
+        Ok(())
+    }
+
+    fn sign_finish_message(
+        &mut self,
+        private_key_handle: &C::IdentityPrivateKeyHandle,
+        signature: &mut EcdsaP256Signature,
+    ) -> SpdmStatus {
+        let ctx = self
+            .transcript_hash_ctx
+            .as_ref()
+            .ok_or(ErrorCode::Unspecified)?;
+
+        let mut transcipt_hash = MaybeUninit::<Sha256Hash>::uninit();
+        let transcipt_hash: &_ = C::sha256_get(ctx, (&mut transcipt_hash).into())?;
+
+        let mut hash_to_sign = MaybeUninit::<Sha256Hash>::uninit();
+        let hash_to_sign =
+            make_message_to_sign_for_finish::<C>(transcipt_hash, (&mut hash_to_sign).into())?;
+        C::ecdsa_sign(
+            private_key_handle,
+            hash_to_sign,
+            signature.manually_drop_mut().into(),
+        )?;
+        // Update the transcript after verifying.
+        self.extend_transcript_hash_with_finish_signature(signature)?;
+        Ok(())
+    }
+
+    fn hmac_finish_message(&mut self, hmac: &mut Sha256Hash) -> SpdmStatus {
+        let ctx = self
+            .transcript_hash_ctx
+            .as_ref()
+            .ok_or(ErrorCode::Unspecified)?;
+
+        let mut message_secrets = MaybeUninit::<MessageSecrets<C>>::uninit();
+        let secrets =
+            generate_message_secrets(self, SessionPhase::Handshake, (&mut message_secrets).into())?;
+
+        let mut transcipt_hash = MaybeUninit::<Sha256Hash>::uninit();
+        let transcipt_hash: &_ = C::sha256_get(ctx, (&mut transcipt_hash).into())?;
+
+        let mut finished_key = MaybeUninit::<<C as Crypto>::HmacSecretKeyHandle>::uninit();
+        let finished_key =
+            generate_finished_key(SpdmRole::Requester, secrets, (&mut finished_key).into())?;
+        C::hmac(finished_key, transcipt_hash, hmac.into())?;
+        self.extend_transcript_hash_with_finish_hmac(hmac)?;
         Ok(())
     }
 }

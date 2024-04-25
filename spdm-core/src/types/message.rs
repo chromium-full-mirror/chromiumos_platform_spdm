@@ -178,7 +178,7 @@ impl GivePubKeyRequest {
 #[derive(FromBytes, AsBytes, Unaligned)]
 pub struct FinishRequest {
     pub version: SpdmVersion,
-    pub response_code: ResponseCode,
+    pub request_code: RequestCode,
     /// Bit 0 indicates whether the signature field is included.
     /// We ignore this field.
     pub param1: Param1,
@@ -194,6 +194,6 @@ try_from_u8_arr!(FinishRequest);
 
 impl FinishRequest {
     pub const SIZE: usize = size_of::<Self>();
-    /// The KeyExchangeResponse size without signature and hmac.
+    /// The FinishRequest size without signature and hmac.
     pub const PARTIAL_SIZE: usize = Self::SIZE - ECDSA_P256_SIGNATURE_SIZE - SHA256_HASH_SIZE;
 }
