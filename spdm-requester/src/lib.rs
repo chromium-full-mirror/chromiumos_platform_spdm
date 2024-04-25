@@ -13,7 +13,8 @@ mod establish;
 mod session;
 mod version;
 
-use error::{RequesterError, RequesterStatus};
+use dispatch::DispatchSecure;
+use error::{RequesterError, RequesterResult, RequesterStatus};
 use establish::finish::FinishSender;
 use establish::get_public_key::GetPubKeySender;
 use establish::get_version::GetVersionSender;
@@ -21,6 +22,7 @@ use establish::give_public_key::GivePubKeySender;
 use establish::key_exchange::KeyExchangeSender;
 use spdm::session::Session;
 use spdm_types::deps::{Crypto, Dispatch, Identity};
+use uninit::out_ref::Out;
 
 /// `RequesterDeps` defines the trait dependencies of `Requester` so it
 /// only needs to be generic on a single type with `RequesterDeps` trait bound.
@@ -47,6 +49,7 @@ impl<D: RequesterDeps> Requester<D> {
         }
     }
 
+    // Establishes the SPDM session. Returns Ok on success.
     pub fn establish_session(&mut self) -> RequesterStatus {
         self.session.reset_session();
         self.get_version()?;
@@ -55,5 +58,13 @@ impl<D: RequesterDeps> Requester<D> {
         self.give_pub_key()?;
         self.finish()?;
         Err(RequesterError)
+    }
+
+    pub fn dispatch_vendor_command<'a>(
+        &mut self,
+        buf: Out<'a, [u8]>,
+        req_size: usize,
+    ) -> RequesterResult<&'a mut [u8]> {
+        self.dispatch_vendor_request(buf, req_size)
     }
 }
