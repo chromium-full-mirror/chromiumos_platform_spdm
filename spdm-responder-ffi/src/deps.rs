@@ -84,6 +84,14 @@ impl Crypto for EalCrypto {
         unimplemented!()
     }
 
+    fn hmac_extract<'a>(
+        _hmac_derivation_key_handle_in: &Self::HmacDerivationKeyHandle,
+        _data: &[u8],
+        _hmac_derivation_key_handle_out: Out<'a, Self::HmacDerivationKeyHandle>,
+    ) -> CryptoResult<&'a mut Self::HmacDerivationKeyHandle> {
+        unimplemented!()
+    }
+
     fn hmac_expand_hmac_secret_key<'a>(
         _hmac_derivation_key_handle: &Self::HmacDerivationKeyHandle,
         _info: &[u8],

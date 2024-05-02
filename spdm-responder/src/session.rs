@@ -5,7 +5,7 @@
 #[cfg_test_mock]
 use mocktopus::macros::*;
 use spdm::session::key_schedule::{
-    generate_finished_key, generate_message_secrets, MessageSecrets,
+    generate_finished_key, generate_main_secret, generate_message_secrets, MessageSecrets,
 };
 use spdm::session::sign::{make_message_to_sign_for_finish, make_message_to_sign_for_key_exchange};
 use spdm::session::{Session, SessionPhase, SpdmRole};
@@ -51,16 +51,25 @@ impl<C: Crypto> ResponderSession<C> for Session<C> {
         my_public_key: &'a mut MaybeUninit<EcP256UncompressedPoint>,
     ) -> SpdmResult<&'a mut EcP256UncompressedPoint> {
         const SALT_0: [u8; SHA256_HASH_SIZE] = [0; SHA256_HASH_SIZE];
-        let mut handle = MaybeUninit::<C::HmacDerivationKeyHandle>::uninit();
+        let mut handshale_secret = MaybeUninit::<C::HmacDerivationKeyHandle>::uninit();
         let (my_public_key, _) = C::hmac_extract_from_ecdh(
             their_public_key,
             &SALT_0,
             my_public_key.as_out(),
-            (&mut handle).into(),
+            (&mut handshale_secret).into(),
         )?;
-        // SAFETY: `handle` is guaranteed to be initialized after a successful
+        // SAFETY: `handshale_secret` is guaranteed to be initialized after a successful
         // `hmac_extract_from_ecdh`.
-        self.handshake_secret = unsafe { Some(handle.assume_init()) };
+        self.handshake_secret = unsafe { Some(handshale_secret.assume_init()) };
+
+        let mut main_secret = MaybeUninit::<C::HmacDerivationKeyHandle>::uninit();
+        generate_main_secret::<C>(
+            self.handshake_secret.as_ref().unwrap(),
+            main_secret.as_out(),
+        )?;
+        // SAFETY: `main_secret` is guaranteed to be initialized after a successful
+        // `generate_main_secret`.
+        self.main_secret = unsafe { Some(main_secret.assume_init()) };
         Ok(my_public_key)
     }
 

@@ -103,6 +103,13 @@ pub trait Crypto {
         salt: &[u8],
         hmac_derivation_key_handle: Out<'a, Self::HmacDerivationKeyHandle>,
     ) -> CryptoResult<&'a mut Self::HmacDerivationKeyHandle>;
+    // Perform HMAC extract from an HMAC derivation handle and data to another hmac derivation
+    // handle.
+    fn hmac_extract<'a>(
+        hmac_derivation_key_handle_in: &Self::HmacDerivationKeyHandle,
+        data: &[u8],
+        hmac_derivation_key_handle_out: Out<'a, Self::HmacDerivationKeyHandle>,
+    ) -> CryptoResult<&'a mut Self::HmacDerivationKeyHandle>;
     /// Perform HMAC expand from using `hmac_derivation_key_handle` and `info`. HMAC
     /// expand uses a secret value as the HMAC key and info as the data to produce
     /// another secret value, pointed by `hmac_secret_key_handle`. It is equivalent

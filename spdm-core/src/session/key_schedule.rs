@@ -4,7 +4,9 @@
 
 use core::mem::{self, MaybeUninit};
 
-use spdm_types::crypto::{AesGcm128Iv, Sha256Hash, SHA256_HASH_SIZE};
+use spdm_types::crypto::{
+    AesGcm128Iv, Sha256Hash, AES_GCM_128_IV_SIZE, AES_GCM_128_KEY_SIZE, SHA256_HASH_SIZE,
+};
 use spdm_types::deps::Crypto;
 use uninit::prelude::*;
 
@@ -15,8 +17,11 @@ use crate::types::message::SequenceNumber;
 const MAX_BIN_CONCAT_SIZE: usize = /* Longest prefix length */ 22 + 32;
 
 const BIN_STR_VERSION: &str = "spdm1.3 ";
+const BIN_STR0_LABEL: &str = "derived";
 const BIN_STR1_LABEL: &str = "req hs data";
 const BIN_STR2_LABEL: &str = "rsp hs data";
+const BIN_STR3_LABEL: &str = "req app data";
+const BIN_STR4_LABEL: &str = "rsp app data";
 const BIN_STR5_LABEL: &str = "key";
 const BIN_STR6_LABEL: &str = "iv";
 const BIN_STR7_LABEL: &str = "finished";
@@ -61,8 +66,13 @@ impl BinConcatBuffer {
 /// - Version: The 8-byte version string ("spdm1.3 " here).
 /// - Label: Variable sized label.
 /// - Context: `Length` size hash, optional.
-fn gen_bin_str(context: Option<&Sha256Hash>, label: &str, buf: &mut BinConcatBuffer) -> SpdmStatus {
-    buf.concat(&(SHA256_HASH_SIZE as u16).to_le_bytes())?;
+fn gen_bin_str(
+    length: usize,
+    context: Option<&Sha256Hash>,
+    label: &str,
+    buf: &mut BinConcatBuffer,
+) -> SpdmStatus {
+    buf.concat(&(length as u16).to_le_bytes())?;
     buf.concat(BIN_STR_VERSION.as_bytes())?;
     buf.concat(label.as_bytes())?;
     if let Some(ctx) = context {
@@ -71,24 +81,50 @@ fn gen_bin_str(context: Option<&Sha256Hash>, label: &str, buf: &mut BinConcatBuf
     Ok(())
 }
 
+fn gen_bin_str0(buf: &mut BinConcatBuffer) -> SpdmStatus {
+    gen_bin_str(SHA256_HASH_SIZE, None, BIN_STR0_LABEL, buf)
+}
+
 fn gen_bin_str1(context: &Sha256Hash, buf: &mut BinConcatBuffer) -> SpdmStatus {
-    gen_bin_str(Some(context), BIN_STR1_LABEL, buf)
+    gen_bin_str(SHA256_HASH_SIZE, Some(context), BIN_STR1_LABEL, buf)
 }
 
 fn gen_bin_str2(context: &Sha256Hash, buf: &mut BinConcatBuffer) -> SpdmStatus {
-    gen_bin_str(Some(context), BIN_STR2_LABEL, buf)
+    gen_bin_str(SHA256_HASH_SIZE, Some(context), BIN_STR2_LABEL, buf)
+}
+
+fn gen_bin_str3(context: &Sha256Hash, buf: &mut BinConcatBuffer) -> SpdmStatus {
+    gen_bin_str(SHA256_HASH_SIZE, Some(context), BIN_STR3_LABEL, buf)
+}
+
+fn gen_bin_str4(context: &Sha256Hash, buf: &mut BinConcatBuffer) -> SpdmStatus {
+    gen_bin_str(SHA256_HASH_SIZE, Some(context), BIN_STR4_LABEL, buf)
 }
 
 fn gen_bin_str5(buf: &mut BinConcatBuffer) -> SpdmStatus {
-    gen_bin_str(None, BIN_STR5_LABEL, buf)
+    gen_bin_str(AES_GCM_128_KEY_SIZE, None, BIN_STR5_LABEL, buf)
 }
 
 fn gen_bin_str6(buf: &mut BinConcatBuffer) -> SpdmStatus {
-    gen_bin_str(None, BIN_STR6_LABEL, buf)
+    gen_bin_str(AES_GCM_128_IV_SIZE, None, BIN_STR6_LABEL, buf)
 }
 
 fn gen_bin_str7(buf: &mut BinConcatBuffer) -> SpdmStatus {
-    gen_bin_str(None, BIN_STR7_LABEL, buf)
+    gen_bin_str(SHA256_HASH_SIZE, None, BIN_STR7_LABEL, buf)
+}
+
+pub fn generate_main_secret<'a, C: Crypto>(
+    handshake_secret: &C::HmacDerivationKeyHandle,
+    main_secret: Out<'a, C::HmacDerivationKeyHandle>,
+) -> SpdmResult<&'a mut C::HmacDerivationKeyHandle> {
+    const ALL_0: [u8; SHA256_HASH_SIZE] = [0; SHA256_HASH_SIZE];
+    let mut bin_str = BinConcatBuffer::default();
+    gen_bin_str0(&mut bin_str)?;
+
+    let mut salt1: MaybeUninit<<C as Crypto>::HmacDerivationKeyHandle> =
+        MaybeUninit::<C::HmacDerivationKeyHandle>::uninit();
+    let salt = C::hmac_expand_derivation_key(handshake_secret, bin_str.as_ref(), salt1.as_out())?;
+    Ok(C::hmac_extract(salt, &ALL_0, main_secret)?)
 }
 
 pub struct MessageSecrets<C: Crypto> {
@@ -118,26 +154,30 @@ pub fn generate_message_secrets<'a, C: Crypto>(
     phase: SessionPhase,
     mut message_secrets: Out<'a, MessageSecrets<C>>,
 ) -> SpdmResult<&'a mut MessageSecrets<C>> {
-    let handshake_secret = session
-        .handshake_secret
-        .as_ref()
-        .ok_or(ErrorCode::Unspecified)?;
     let mut req_bin_str = BinConcatBuffer::default();
     let mut rsp_bin_str = BinConcatBuffer::default();
-    match phase {
+    let secret = match phase {
         SessionPhase::None => return Err(ErrorCode::Unspecified),
         SessionPhase::Handshake => {
             let th = session.th1.as_ref().ok_or(ErrorCode::Unspecified)?;
             gen_bin_str1(th, &mut req_bin_str)?;
             gen_bin_str2(th, &mut rsp_bin_str)?;
+            session
+                .handshake_secret
+                .as_ref()
+                .ok_or(ErrorCode::Unspecified)?
         }
-        // TODO(b/284404632): Implement data phase session encryption/decryption.
-        SessionPhase::Data => return Err(ErrorCode::Unspecified),
+        SessionPhase::Data => {
+            let th = session.th2.as_ref().ok_or(ErrorCode::Unspecified)?;
+            gen_bin_str3(th, &mut req_bin_str)?;
+            gen_bin_str4(th, &mut rsp_bin_str)?;
+            session.main_secret.as_ref().ok_or(ErrorCode::Unspecified)?
+        }
     };
     let (request_direction, response_direction) =
         MessageSecrets::split_fields_out(message_secrets.r());
-    C::hmac_expand_derivation_key(handshake_secret, req_bin_str.as_ref(), request_direction)?;
-    C::hmac_expand_derivation_key(handshake_secret, rsp_bin_str.as_ref(), response_direction)?;
+    C::hmac_expand_derivation_key(secret, req_bin_str.as_ref(), request_direction)?;
+    C::hmac_expand_derivation_key(secret, rsp_bin_str.as_ref(), response_direction)?;
     // SAFETY: both fields are guaranteed to be initialized after successful
     // `hmac_expand`s.
     Ok(unsafe { message_secrets.assume_init() })
