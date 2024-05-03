@@ -1,0 +1,81 @@
+// Copyright 2024 The ChromiumOS Authors
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+mod deps;
+
+use deps::crypto::CryptoImpl;
+use deps::identity::IdentityImpl;
+use spdm_requester::{Requester, RequesterDeps};
+use spdm_responder::{Dispatcher, Responder, ResponderDeps};
+use spdm_types::deps::{Dispatch, Vendor};
+
+// The simplest dispatch logic will be to own the responder itself,
+// and just call `dispatch_request` on it.
+pub struct DispatchToResponder<D: ResponderDeps>(Responder<D>);
+
+impl<D: ResponderDeps> Dispatch for DispatchToResponder<D> {
+    fn dispatch_request<'a>(
+        &mut self,
+        is_secure: bool,
+        mut buf: uninit::prelude::Out<'a, [u8]>,
+        req_size: usize,
+    ) -> &'a mut [u8] {
+        // SAFETY: `dispatch_request` should only read the first `req_size` of buf, which
+        // is guaranteed to be initialized. Also, the first `resp_size` of the buffer is
+        // guaranteed to be initialized.
+        unsafe {
+            let resp_size = self
+                .0
+                .dispatch_request(is_secure, buf.r().assume_init(), req_size);
+            buf.get_unchecked_out(..resp_size).assume_init()
+        }
+    }
+}
+
+pub struct RequesterDepsImpl<D: ResponderDeps> {
+    _phantom: D,
+}
+
+impl<D: ResponderDeps> RequesterDeps for RequesterDepsImpl<D> {
+    type Crypto = CryptoImpl;
+    type Identity = IdentityImpl;
+    type Dispatch = DispatchToResponder<D>;
+}
+
+// Let's make the responder respond to the vendor message by duplicating
+// and reversing the second half of the request message. This is simple
+// while capable of testing that we receive the request correctly, and
+// that the response might be larger than the request.
+pub struct Palindromize;
+
+impl Vendor for Palindromize {
+    fn process_vendor_request(&self, buf: &mut [u8], req_size: usize) -> usize {
+        if buf.len() < req_size * 2 {
+            return 0;
+        }
+        let reversed = buf[..req_size].iter().rev().cloned().collect::<Vec<u8>>();
+        buf[req_size..req_size * 2].copy_from_slice(&reversed);
+        req_size * 2
+    }
+}
+
+pub struct ResponderDepsImpl;
+
+impl ResponderDeps for ResponderDepsImpl {
+    type Crypto = CryptoImpl;
+    type Identity = IdentityImpl;
+    type Vendor = Palindromize;
+}
+
+// TODO(b/338528575): The test would not work yet because we haven't implemented the traits.
+// Let's just expect it should panic due to unimplemented! first.
+#[test]
+#[should_panic]
+fn test_establish() {
+    let responder = Responder::<ResponderDepsImpl>::new(IdentityImpl, Palindromize);
+    let mut requester: Requester<RequesterDepsImpl<ResponderDepsImpl>> =
+        Requester::<RequesterDepsImpl<_>>::new(IdentityImpl, DispatchToResponder(responder));
+
+    requester.establish_session().unwrap();
+}

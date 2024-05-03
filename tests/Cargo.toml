@@ -1,0 +1,16 @@
+[package]
+name = "tests"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[dev-dependencies]
+spdm_types = { path = "../spdm-types" }
+spdm_requester = { path = "../spdm-requester" }
+spdm_responder = { path = "../spdm-responder" }
+uninit = { version = "0.6", default-features = false }
+openssl = "0.10"
+
+[[test]]
+name = "test_establish"
+path = "establish.rs"

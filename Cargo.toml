@@ -7,6 +7,7 @@ members = [
   "spdm-responder",
   "spdm-types",
   "test-deps",
+  "tests",
 ]
 default-members = [
   "spdm-core",
@@ -15,6 +16,7 @@ default-members = [
   "spdm-responder-ffi",
   "spdm-responder",
   "spdm-types",
+  "tests",
 ]
 
 resolver = "2"
