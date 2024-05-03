@@ -43,7 +43,7 @@ fn make_prefix<'a>(role: SpdmRole, context: &str, buf: Out<'a, [u8]>) -> SpdmRes
     }
     // Unfilled positions in the middle will be zero-padded according to the spec,
     // so let's just initialize it with zeroes.
-    let buf = buf.init_with(repeat(0));
+    let buf = buf.fill_with_iter(repeat(0));
     for i in (0..PREFIX_VERSION_LENGTH).step_by(PREFIX_VERSION_STR.len()) {
         buf[i..i + PREFIX_VERSION_STR.len()].copy_from_slice(PREFIX_VERSION_STR.as_bytes());
     }

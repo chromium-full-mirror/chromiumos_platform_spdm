@@ -179,7 +179,7 @@ impl Crypto for TestCrypto {
     }
 
     fn random_bytes(buf: Out<[u8]>) -> CryptoResult<&mut [u8]> {
-        Ok(buf.init_with(repeat(0xDD)))
+        Ok(buf.fill_with_iter(repeat(0xDD)))
     }
 
     fn random_key_pair<'a>(

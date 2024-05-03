@@ -39,12 +39,7 @@ pub trait DispatchSecure {
     ) -> RequesterResult<&'a mut [u8]> {
         let buf_len = buf.len();
         // SAFETY: buf[..req_size] is guaranteed to be initialized.
-        let plain_req = unsafe {
-            buf.r()
-                .get_out(..req_size)
-                .unwrap_unchecked()
-                .assume_all_init()
-        };
+        let plain_req = unsafe { buf.r().get_unchecked_out(..req_size).assume_init() };
         // Reserve a vector with enough size to contain the encrypted response.
         let max_encrypted_response_size =
             REQUEST_OFFSET + buf_len + MAX_RANDOM_SIZE + AES_GCM_128_TAG_SIZE;
@@ -88,12 +83,7 @@ pub trait DispatchSecure {
     ) -> RequesterResult<&'a mut [u8]> {
         let buf_len = buf.len();
         // SAFETY: buf[..req_size] is guaranteed to be initialized.
-        let plain_req = unsafe {
-            buf.r()
-                .get_out(..req_size)
-                .unwrap_unchecked()
-                .assume_all_init()
-        };
+        let plain_req = unsafe { buf.r().get_unchecked_out(..req_size).assume_init() };
         // Reserve a vector with enough size to contain the encrypted response.
         let offset = REQUEST_OFFSET + VENDOR_COMMAND_HEADER_SIZE;
         let max_encrypted_response_size = offset + buf_len + MAX_RANDOM_SIZE + AES_GCM_128_TAG_SIZE;
@@ -206,7 +196,7 @@ mod tests {
                         // Return response that is identical to the request.
                         // SAFETY: buf[..req_size] is guaranteed to be initialized.
                         MockResult::Return(unsafe {
-                            buf.get_out(..req_size).unwrap_unchecked().assume_all_init()
+                            buf.get_unchecked_out(..req_size).assume_init()
                         })
                     },
                 )
@@ -251,7 +241,7 @@ mod tests {
                         // Return response that is identical to the request.
                         // SAFETY: buf[..req_size] is guaranteed to be initialized.
                         MockResult::Return(unsafe {
-                            buf.get_out(..req_size).unwrap_unchecked().assume_all_init()
+                            buf.get_unchecked_out(..req_size).assume_init()
                         })
                     },
                 )
@@ -296,7 +286,7 @@ mod tests {
                         // Return response that is identical to the request.
                         // SAFETY: buf[..req_size] is guaranteed to be initialized.
                         MockResult::Return(unsafe {
-                            buf.get_out(..req_size).unwrap_unchecked().assume_all_init()
+                            buf.get_unchecked_out(..req_size).assume_init()
                         })
                     },
                 )
@@ -345,7 +335,7 @@ mod tests {
                         // Return response that is identical to the request.
                         // SAFETY: buf[..req_size] is guaranteed to be initialized.
                         MockResult::Return(unsafe {
-                            buf.get_out(..req_size).unwrap_unchecked().assume_all_init()
+                            buf.get_unchecked_out(..req_size).assume_init()
                         })
                     },
                 )
