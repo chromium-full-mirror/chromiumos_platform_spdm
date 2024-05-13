@@ -165,7 +165,7 @@ mod tests {
         use std::cell::RefCell;
 
         use mocktopus::mocking::{MockContext, MockResult};
-        use spdm_test_deps::{TestCrypto, TestDispatch, TestIdentity};
+        use spdm_test_deps::{HmacDerivationKeyHandle, TestCrypto, TestDispatch, TestIdentity};
         use spdm_types::deps::{Crypto, CryptoError};
 
         use super::super::*;
@@ -179,7 +179,7 @@ mod tests {
 
             requester.session.session_id = Some([0xaa, 0xbb, 0xcc, 0xdd]);
             requester.session.th1 = Some([0xCC; 32]);
-            requester.session.handshake_secret = Some(());
+            requester.session.handshake_secret = Some(HmacDerivationKeyHandle);
 
             let plaintext = RefCell::new(vec![]);
             MockContext::new()
@@ -318,7 +318,7 @@ mod tests {
 
             requester.session.session_id = Some([0xaa, 0xbb, 0xcc, 0xdd]);
             requester.session.th2 = Some([0xCC; 32]);
-            requester.session.main_secret = Some(());
+            requester.session.main_secret = Some(HmacDerivationKeyHandle);
 
             let plaintext = RefCell::new(vec![]);
             MockContext::new()

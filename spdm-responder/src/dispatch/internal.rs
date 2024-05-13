@@ -201,7 +201,7 @@ mod tests {
     #[cfg(feature = "mock")]
     mod mock {
         use mocktopus::mocking::{MockContext, MockResult};
-        use spdm_test_deps::TestCrypto;
+        use spdm_test_deps::{HmacDerivationKeyHandle, TestCrypto};
         use spdm_types::deps::Crypto;
 
         use super::*;
@@ -220,7 +220,7 @@ mod tests {
             let mut spdm = Responder::<TestResponderDeps>::new(TestIdentity, TestVendor);
             spdm.session.session_id = Some([0xaa, 0xbb, 0xcc, 0xdd]);
             spdm.session.th1 = Some([0xCC; 32]);
-            spdm.session.handshake_secret = Some(());
+            spdm.session.handshake_secret = Some(HmacDerivationKeyHandle);
             spdm.state = ResponderState::WaitForRequesterKey;
             MockContext::new()
                 .mock_safe(TestCrypto::aes_gcm_decrypt, |_, _, _, _, buf| {

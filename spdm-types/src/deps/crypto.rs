@@ -113,8 +113,8 @@ pub trait Crypto {
     /// Perform HMAC expand from using `hmac_derivation_key_handle` and `info`. HMAC
     /// expand uses a secret value as the HMAC key and info as the data to produce
     /// another secret value, pointed by `hmac_secret_key_handle`. It is equivalent
-    /// to the first `output_size` bytes of `HMAC(key, info||0x00)` because in SPDM
-    /// we always expand to less than the hash size.
+    /// to the first `output_size` bytes of `HMAC(key, info||0x01)` because in SPDM
+    /// we always expand to less or equal than the hash size.
     /// This expands into a HMAC secret key which can be used for performing ordinary HMAC.
     fn hmac_expand_hmac_secret_key<'a>(
         hmac_derivation_key_handle: &Self::HmacDerivationKeyHandle,
@@ -176,11 +176,11 @@ pub trait Crypto {
     /// Fill `buf` with random bytes.
     fn random_bytes(buf: Out<[u8]>) -> CryptoResult<&mut [u8]>;
     /// Randomly generate a valid P256 EC key pair.
-    fn random_key_pair<'a>(
+    fn random_key_pair<'a, 'b>(
         private: Out<'a, Self::IdentityPrivateKeyHandle>,
-        public: Out<'a, IdentityPublicKey>,
+        public: Out<'b, IdentityPublicKey>,
     ) -> CryptoResult<(
         &'a mut Self::IdentityPrivateKeyHandle,
-        &'a mut IdentityPublicKey,
+        &'b mut IdentityPublicKey,
     )>;
 }

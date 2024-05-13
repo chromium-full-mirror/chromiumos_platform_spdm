@@ -30,18 +30,24 @@ const TEST_TAG: AesGcm128Tag = [0xCD; AES_GCM_128_TAG_SIZE];
 
 pub struct TestCrypto;
 
+pub struct IdentityPrivateKeyHandle;
+pub struct Sha256HashContext;
+pub struct HmacDerivationKeyHandle;
+pub struct HmacSecretKeyHandle;
+pub struct AesGcmKeyHandle;
+
 #[cfg_attr(feature = "mock", mockable)]
 impl Crypto for TestCrypto {
-    type IdentityPrivateKeyHandle = ();
-    type Sha256HashContext = ();
-    type HmacDerivationKeyHandle = ();
-    type HmacSecretKeyHandle = ();
-    type AesGcmKeyHandle = ();
+    type IdentityPrivateKeyHandle = IdentityPrivateKeyHandle;
+    type Sha256HashContext = Sha256HashContext;
+    type HmacDerivationKeyHandle = HmacDerivationKeyHandle;
+    type HmacSecretKeyHandle = HmacSecretKeyHandle;
+    type AesGcmKeyHandle = AesGcmKeyHandle;
 
     fn sha256_init(
         ctx: Out<Self::Sha256HashContext>,
     ) -> CryptoResult<&mut Self::Sha256HashContext> {
-        Ok(ctx.write(()))
+        Ok(ctx.write(Sha256HashContext))
     }
 
     fn sha256_update(_ctx: &mut Self::Sha256HashContext, _data: &[u8]) -> CryptoStatus {
@@ -84,7 +90,7 @@ impl Crypto for TestCrypto {
         _salt: &[u8],
         hmac_derivation_key_handle: Out<'a, Self::HmacDerivationKeyHandle>,
     ) -> CryptoResult<&'a mut Self::HmacDerivationKeyHandle> {
-        Ok(hmac_derivation_key_handle.write(()))
+        Ok(hmac_derivation_key_handle.write(HmacDerivationKeyHandle))
     }
 
     fn hmac_extract_from_ecdh<'a, 'b>(
@@ -98,7 +104,7 @@ impl Crypto for TestCrypto {
     )> {
         Ok((
             my_public_key.write(TEST_PUBLIC_KEY),
-            hmac_derivation_key_handle.write(()),
+            hmac_derivation_key_handle.write(HmacDerivationKeyHandle),
         ))
     }
 
@@ -107,7 +113,7 @@ impl Crypto for TestCrypto {
         _data: &[u8],
         hmac_derivation_key_handle_out: Out<'a, Self::HmacDerivationKeyHandle>,
     ) -> CryptoResult<&'a mut Self::HmacDerivationKeyHandle> {
-        Ok(hmac_derivation_key_handle_out.write(()))
+        Ok(hmac_derivation_key_handle_out.write(HmacDerivationKeyHandle))
     }
 
     fn hmac_expand_hmac_secret_key<'a>(
@@ -115,7 +121,7 @@ impl Crypto for TestCrypto {
         _info: &[u8],
         hmac_secret_key_handle: Out<'a, Self::HmacSecretKeyHandle>,
     ) -> CryptoResult<&'a mut Self::HmacSecretKeyHandle> {
-        Ok(hmac_secret_key_handle.write(()))
+        Ok(hmac_secret_key_handle.write(HmacSecretKeyHandle))
     }
 
     fn hmac_expand_derivation_key<'a>(
@@ -123,19 +129,19 @@ impl Crypto for TestCrypto {
         _info: &[u8],
         hmac_derivation_key_handle_out: Out<'a, Self::HmacDerivationKeyHandle>,
     ) -> CryptoResult<&'a mut Self::HmacDerivationKeyHandle> {
-        Ok(hmac_derivation_key_handle_out.write(()))
+        Ok(hmac_derivation_key_handle_out.write(HmacDerivationKeyHandle))
     }
 
     fn hmac_expand_aes_gcm_key<'a>(
-        _hmac_secret_key_handle: &Self::HmacSecretKeyHandle,
+        _hmac_derivation_key_handle: &Self::HmacDerivationKeyHandle,
         _info: &[u8],
         aes_gcm_key: Out<'a, Self::AesGcmKeyHandle>,
     ) -> CryptoResult<&'a mut Self::AesGcmKeyHandle> {
-        Ok(aes_gcm_key.write(()))
+        Ok(aes_gcm_key.write(AesGcmKeyHandle))
     }
 
     fn hmac_expand_aes_gcm_iv<'a>(
-        _hmac_secret_key_handle: &Self::HmacSecretKeyHandle,
+        _hmac_derivation_key_handle: &Self::HmacDerivationKeyHandle,
         _info: &[u8],
         aes_gcm_iv: Out<'a, AesGcm128Iv>,
     ) -> CryptoResult<&'a mut AesGcm128Iv> {
@@ -182,13 +188,16 @@ impl Crypto for TestCrypto {
         Ok(buf.fill_with_iter(repeat(0xDD)))
     }
 
-    fn random_key_pair<'a>(
+    fn random_key_pair<'a, 'b>(
         private: Out<'a, Self::IdentityPrivateKeyHandle>,
-        public: Out<'a, IdentityPublicKey>,
+        public: Out<'b, IdentityPublicKey>,
     ) -> CryptoResult<(
         &'a mut Self::IdentityPrivateKeyHandle,
-        &'a mut IdentityPublicKey,
+        &'b mut IdentityPublicKey,
     )> {
-        Ok((private.write(()), public.write(TEST_IDENTITY_PUBLIC_KEY)))
+        Ok((
+            private.write(IdentityPrivateKeyHandle),
+            public.write(TEST_IDENTITY_PUBLIC_KEY),
+        ))
     }
 }

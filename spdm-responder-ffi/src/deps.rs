@@ -14,14 +14,19 @@ type IdentityPrivateKey = [u8; 32];
 /// Implements Crypto by interacting with the static eal functions.
 pub struct EalCrypto;
 
+pub struct Sha256HashContext;
+pub struct HmacDerivationKeyHandle;
+pub struct HmacSecretKeyHandle;
+pub struct AesGcmKeyHandle;
+
 impl Crypto for EalCrypto {
     /// Use raw private key for eal's private key handle.
     type IdentityPrivateKeyHandle = IdentityPrivateKey;
     // TODO(b/284404632): Decide some crypto types for eal.
-    type Sha256HashContext = ();
-    type HmacDerivationKeyHandle = ();
-    type HmacSecretKeyHandle = ();
-    type AesGcmKeyHandle = ();
+    type Sha256HashContext = Sha256HashContext;
+    type HmacDerivationKeyHandle = HmacDerivationKeyHandle;
+    type HmacSecretKeyHandle = HmacSecretKeyHandle;
+    type AesGcmKeyHandle = AesGcmKeyHandle;
 
     fn sha256_init(
         _ctx: Out<Self::Sha256HashContext>,
@@ -103,13 +108,13 @@ impl Crypto for EalCrypto {
     fn hmac_expand_derivation_key<'a>(
         _hmac_derivation_key_handle_in: &Self::HmacDerivationKeyHandle,
         _info: &[u8],
-        hmac_derivation_key_handle_out: Out<'a, Self::HmacDerivationKeyHandle>,
+        _hmac_derivation_key_handle_out: Out<'a, Self::HmacDerivationKeyHandle>,
     ) -> CryptoResult<&'a mut Self::HmacDerivationKeyHandle> {
-        Ok(hmac_derivation_key_handle_out.write(()))
+        unimplemented!()
     }
 
     fn hmac_expand_aes_gcm_key<'a>(
-        _hmac_secret_key_handle: &Self::HmacSecretKeyHandle,
+        _hmac_derivation_key_handle: &Self::HmacDerivationKeyHandle,
         _info: &[u8],
         _aes_gcm_key: Out<'a, Self::AesGcmKeyHandle>,
     ) -> CryptoResult<&'a mut Self::AesGcmKeyHandle> {
@@ -117,7 +122,7 @@ impl Crypto for EalCrypto {
     }
 
     fn hmac_expand_aes_gcm_iv<'a>(
-        _hmac_secret_key_handle: &Self::HmacSecretKeyHandle,
+        _hmac_derivation_key_handle: &Self::HmacDerivationKeyHandle,
         _info: &[u8],
         _aes_gcm_iv: Out<'a, AesGcm128Iv>,
     ) -> CryptoResult<&'a mut AesGcm128Iv> {
@@ -164,12 +169,12 @@ impl Crypto for EalCrypto {
         unimplemented!()
     }
 
-    fn random_key_pair<'a>(
+    fn random_key_pair<'a, 'b>(
         _private: Out<'a, Self::IdentityPrivateKeyHandle>,
-        _public: Out<'a, IdentityPublicKey>,
+        _public: Out<'b, IdentityPublicKey>,
     ) -> CryptoResult<(
         &'a mut Self::IdentityPrivateKeyHandle,
-        &'a mut IdentityPublicKey,
+        &'b mut IdentityPublicKey,
     )> {
         unimplemented!()
     }

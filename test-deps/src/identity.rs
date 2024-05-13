@@ -8,6 +8,7 @@ use spdm_types::crypto::{EcP256UncompressedPoint, EC_P256_COORD_SIZE};
 use spdm_types::deps::{Identity, IdentityPublicKey};
 
 use super::crypto::TestCrypto;
+use crate::IdentityPrivateKeyHandle;
 
 // This is not a real EC point, but that's fine for test.
 pub const TEST_IDENTITY_PUBLIC_KEY: EcP256UncompressedPoint = EcP256UncompressedPoint {
@@ -25,8 +26,8 @@ impl Identity for TestIdentity {
         &TEST_IDENTITY_PUBLIC_KEY
     }
 
-    fn identity_private_key_handle(&self) -> &() {
-        &()
+    fn identity_private_key_handle(&self) -> &IdentityPrivateKeyHandle {
+        &IdentityPrivateKeyHandle
     }
 
     fn is_public_key_valid(_public_key: &EcP256UncompressedPoint) -> bool {
