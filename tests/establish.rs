@@ -9,6 +9,7 @@ use deps::identity::IdentityImpl;
 use spdm_requester::{Requester, RequesterDeps};
 use spdm_responder::{Dispatcher, Responder, ResponderDeps};
 use spdm_types::deps::{Dispatch, Vendor};
+use uninit::extension_traits::AsOut;
 
 // The simplest dispatch logic will be to own the responder itself,
 // and just call `dispatch_request` on it.
@@ -68,14 +69,30 @@ impl ResponderDeps for ResponderDepsImpl {
     type Vendor = Palindromize;
 }
 
-// TODO(b/338528575): The test would not work yet because we haven't implemented the traits.
-// Let's just expect it should panic due to unimplemented! first.
 #[test]
-#[should_panic]
 fn test_establish() {
-    let responder = Responder::<ResponderDepsImpl>::new(IdentityImpl, Palindromize);
-    let mut requester: Requester<RequesterDepsImpl<ResponderDepsImpl>> =
-        Requester::<RequesterDepsImpl<_>>::new(IdentityImpl, DispatchToResponder(responder));
+    let identity = IdentityImpl::try_new().expect("Failed to create Identity.");
+    let responder = Responder::<ResponderDepsImpl>::new(identity, Palindromize);
 
-    requester.establish_session().unwrap();
+    let identity = IdentityImpl::try_new().expect("Failed to create Identity.");
+    let mut requester: Requester<RequesterDepsImpl<ResponderDepsImpl>> =
+        Requester::<RequesterDepsImpl<_>>::new(identity, DispatchToResponder(responder));
+
+    requester
+        .establish_session()
+        .expect("Failed to establish session.");
+
+    // Send the first vendor command.
+    let mut buf = [1, 2, 3, 4, 0, 0, 0, 0];
+    let buf = requester
+        .dispatch_vendor_command(buf.as_out(), 4)
+        .expect("Failed to dispatch vendor command.");
+    assert_eq!(buf, [1, 2, 3, 4, 4, 3, 2, 1]);
+
+    // Send the second vendor command.
+    let mut buf = [3, 4, 0, 0];
+    let buf = requester
+        .dispatch_vendor_command(buf.as_out(), 2)
+        .expect("Failed to dispatch vendor command.");
+    assert_eq!(buf, [3, 4, 4, 3]);
 }
