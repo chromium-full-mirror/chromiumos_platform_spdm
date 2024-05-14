@@ -8,7 +8,7 @@
 mod test;
 
 mod dispatch;
-mod error;
+pub mod error;
 mod establish;
 mod session;
 mod version;

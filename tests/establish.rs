@@ -4,8 +4,12 @@
 
 mod deps;
 
+use std::cell::RefCell;
+use std::rc::Rc;
+
 use deps::crypto::CryptoImpl;
 use deps::identity::IdentityImpl;
+use spdm_requester::error::RequesterError;
 use spdm_requester::{Requester, RequesterDeps};
 use spdm_responder::{Dispatcher, Responder, ResponderDeps};
 use spdm_types::deps::{Dispatch, Vendor};
@@ -13,7 +17,7 @@ use uninit::extension_traits::AsOut;
 
 // The simplest dispatch logic will be to own the responder itself,
 // and just call `dispatch_request` on it.
-pub struct DispatchToResponder<D: ResponderDeps>(Responder<D>);
+pub struct DispatchToResponder<D: ResponderDeps>(Rc<RefCell<Responder<D>>>);
 
 impl<D: ResponderDeps> Dispatch for DispatchToResponder<D> {
     fn dispatch_request<'a>(
@@ -26,9 +30,10 @@ impl<D: ResponderDeps> Dispatch for DispatchToResponder<D> {
         // is guaranteed to be initialized. Also, the first `resp_size` of the buffer is
         // guaranteed to be initialized.
         unsafe {
-            let resp_size = self
-                .0
-                .dispatch_request(is_secure, buf.r().assume_init(), req_size);
+            let resp_size =
+                self.0
+                    .borrow_mut()
+                    .dispatch_request(is_secure, buf.r().assume_init(), req_size);
             buf.get_unchecked_out(..resp_size).assume_init()
         }
     }
@@ -76,7 +81,10 @@ fn test_establish() {
 
     let identity = IdentityImpl::try_new().expect("Failed to create Identity.");
     let mut requester: Requester<RequesterDepsImpl<ResponderDepsImpl>> =
-        Requester::<RequesterDepsImpl<_>>::new(identity, DispatchToResponder(responder));
+        Requester::<RequesterDepsImpl<_>>::new(
+            identity,
+            DispatchToResponder(Rc::new(RefCell::new(responder))),
+        );
 
     requester
         .establish_session()
@@ -95,4 +103,66 @@ fn test_establish() {
         .dispatch_vendor_command(buf.as_out(), 2)
         .expect("Failed to dispatch vendor command.");
     assert_eq!(buf, [3, 4, 4, 3]);
+}
+
+#[test]
+fn test_establish_failures() {
+    let identity = IdentityImpl::try_new().expect("Failed to create Identity.");
+    let responder = Rc::new(RefCell::new(Responder::<ResponderDepsImpl>::new(
+        identity,
+        Palindromize,
+    )));
+
+    let identity = IdentityImpl::try_new().expect("Failed to create Identity.");
+    let mut requester: Requester<RequesterDepsImpl<ResponderDepsImpl>> =
+        Requester::<RequesterDepsImpl<_>>::new(identity, DispatchToResponder(responder.clone()));
+
+    // Dispatching vendor commands before session established should fail.
+    let mut buf = [1, 2, 3, 4, 0, 0, 0, 0];
+    assert_eq!(
+        requester.dispatch_vendor_command(buf.as_out(), 4),
+        Err(RequesterError)
+    );
+
+    requester
+        .establish_session()
+        .expect("Failed to establish session.");
+    // Now the command should succeed.
+    let buf = requester
+        .dispatch_vendor_command(buf.as_out(), 4)
+        .expect("Failed to dispatch vendor command.");
+    assert_eq!(buf, [1, 2, 3, 4, 4, 3, 2, 1]);
+
+    // Establishing session again should succeed.
+    requester
+        .establish_session()
+        .expect("Failed to establish session.");
+    let mut buf = [3, 4, 0, 0];
+    let buf = requester
+        .dispatch_vendor_command(buf.as_out(), 2)
+        .expect("Failed to dispatch vendor command.");
+    assert_eq!(buf, [3, 4, 4, 3]);
+
+    // Breaking some state should cause dispatch command to fail. Let's assume another
+    // requester sets up a session with the responder.
+    let identity = IdentityImpl::try_new().expect("Failed to create Identity.");
+    let mut requester2: Requester<RequesterDepsImpl<ResponderDepsImpl>> =
+        Requester::<RequesterDepsImpl<_>>::new(identity, DispatchToResponder(responder));
+    requester2
+        .establish_session()
+        .expect("Failed to establish session.");
+    // Now the original requester should fail to send vendor command.
+    let mut buf = [1, 2, 3, 0, 0, 0];
+    assert_eq!(
+        requester.dispatch_vendor_command(buf.as_out(), 3),
+        Err(RequesterError)
+    );
+    // But after re-establishing the session, vendor command should work again.
+    requester
+        .establish_session()
+        .expect("Failed to establish session.");
+    let buf = requester
+        .dispatch_vendor_command(buf.as_out(), 3)
+        .expect("Failed to dispatch vendor command.");
+    assert_eq!(buf, [1, 2, 3, 3, 2, 1]);
 }
