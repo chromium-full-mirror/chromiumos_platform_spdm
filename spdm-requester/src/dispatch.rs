@@ -94,7 +94,7 @@ pub trait DispatchSecure {
         let resp = self.dispatch_secure_request_internal(
             SessionPhase::Data,
             &mut encrypted_request_buf,
-            req_size,
+            VENDOR_COMMAND_HEADER_SIZE + req_size,
         )?;
         if resp.len() < VENDOR_COMMAND_HEADER_SIZE {
             return Err(RequesterError);

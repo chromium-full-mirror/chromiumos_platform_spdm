@@ -14,7 +14,7 @@ mod session;
 mod version;
 
 use dispatch::DispatchSecure;
-use error::{RequesterError, RequesterResult, RequesterStatus};
+use error::{RequesterResult, RequesterStatus};
 use establish::finish::FinishSender;
 use establish::get_public_key::GetPubKeySender;
 use establish::get_version::GetVersionSender;
@@ -57,7 +57,7 @@ impl<D: RequesterDeps> Requester<D> {
         self.key_exchange()?;
         self.give_pub_key()?;
         self.finish()?;
-        Err(RequesterError)
+        Ok(())
     }
 
     pub fn dispatch_vendor_command<'a>(
