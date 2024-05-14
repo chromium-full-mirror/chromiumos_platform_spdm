@@ -95,16 +95,36 @@ impl<C: Crypto> Session<C> {
     }
 
     /// Resets the current session.
-    pub fn reset_session(&mut self) {
-        *self = Session::default();
+    pub fn reset_session(&mut self, role: SpdmRole) {
+        // The public key of `role` should not be reset.
+        let (requester_public_key, responder_public_key) = match role {
+            SpdmRole::Requester => (self.requester_public_key.take(), None),
+            SpdmRole::Responder => (None, self.responder_public_key.take()),
+        };
+
+        *self = Self {
+            requester_public_key,
+            responder_public_key,
+            ..Default::default()
+        }
     }
 
     // Like reset_session, but keep the VCA cache so GetVersion doesn't need to be
     // sent again.
-    pub fn reset_session_keep_vca_cache(&mut self) {
-        let transcript = self.transcript;
-        *self = Session::default();
-        self.transcript = transcript;
+    pub fn reset_session_keep_vca_cache(&mut self, role: SpdmRole) {
+        let transcript = self.transcript.take();
+        // The public key of `role` should not be reset.
+        let (requester_public_key, responder_public_key) = match role {
+            SpdmRole::Requester => (self.requester_public_key.take(), None),
+            SpdmRole::Responder => (None, self.responder_public_key.take()),
+        };
+
+        *self = Self {
+            transcript,
+            requester_public_key,
+            responder_public_key,
+            ..Default::default()
+        }
     }
 
     /// Sets the negotiation transcript of the current session. This is the

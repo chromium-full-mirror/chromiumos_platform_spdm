@@ -20,7 +20,7 @@ use establish::get_public_key::GetPubKeySender;
 use establish::get_version::GetVersionSender;
 use establish::give_public_key::GivePubKeySender;
 use establish::key_exchange::KeyExchangeSender;
-use spdm::session::Session;
+use spdm::session::{Session, SpdmRole};
 use spdm_types::deps::{Crypto, Dispatch, Identity};
 use uninit::out_ref::Out;
 
@@ -51,7 +51,7 @@ impl<D: RequesterDeps> Requester<D> {
 
     // Establishes the SPDM session. Returns Ok on success.
     pub fn establish_session(&mut self) -> RequesterStatus {
-        self.session.reset_session();
+        self.session.reset_session(SpdmRole::Requester);
         self.get_version()?;
         self.get_pub_key()?;
         self.key_exchange()?;

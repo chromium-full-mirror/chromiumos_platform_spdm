@@ -8,7 +8,7 @@ use core::mem::MaybeUninit;
 use mocktopus::macros::*;
 use spdm::session::aead::{decrypt_secure_message, encrypt_secure_message, REQUEST_OFFSET};
 use spdm::session::key_schedule::{get_session_keys, AeadSessionKeys};
-use spdm::session::SessionPhase;
+use spdm::session::{SessionPhase, SpdmRole};
 use spdm::types::code::RequestCode;
 use spdm::types::error::{ErrorCode, SpdmResult};
 use spdm_proc_macros::{cfg_test_mock, cfg_test_mockable};
@@ -75,11 +75,12 @@ impl<D: ResponderDeps> InternalDispatcher for Responder<D> {
         }
         let req_code = parse_header(&buf[..req_size])?;
         if req_code == RequestCode::GetVersion {
-            self.session.reset_session();
+            self.session.reset_session(SpdmRole::Responder);
             self.state = ResponderState::default();
         }
         if req_code == RequestCode::GetPubKey {
-            self.session.reset_session_keep_vca_cache();
+            self.session
+                .reset_session_keep_vca_cache(SpdmRole::Responder);
             self.state = ResponderState::default();
         }
         if self.state.phase() != SessionPhase::None {
