@@ -20,7 +20,13 @@ pub type CryptoStatus = CryptoResult<()>;
 
 /// Crypto trait defines the interface of cryptographic functions and types
 /// used in SPDM. Crypto methods should be purely static.
-pub trait Crypto {
+/// # Safety
+/// Many trait methods of this trait take `Out` parameters and returns a `Result`.
+/// The implementation must guarantee that when those methods return `Ok`, all
+/// the `Out` parameters' pointees have been initialized. This way the caller can
+/// safely assume that after the method call returns `Ok` the `MaybeUninit` parameters
+/// they passed are guaranteed to be initialized.
+pub unsafe trait Crypto {
     type IdentityPrivateKeyHandle;
     /// This is the context object for SHA256 hash operations.
     type Sha256HashContext;

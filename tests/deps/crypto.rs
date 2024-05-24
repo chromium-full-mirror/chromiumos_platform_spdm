@@ -90,7 +90,7 @@ impl CryptoImpl {
     }
 }
 
-impl Crypto for CryptoImpl {
+unsafe impl Crypto for CryptoImpl {
     type IdentityPrivateKeyHandle = RawKey<IdentityPrivateKeyTag>;
     type Sha256HashContext = Sha256;
     type HmacDerivationKeyHandle = RawKey<HmacDerivationKeyTag>;

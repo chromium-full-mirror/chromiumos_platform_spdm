@@ -37,7 +37,7 @@ pub struct HmacSecretKeyHandle;
 pub struct AesGcmKeyHandle;
 
 #[cfg_attr(feature = "mock", mockable)]
-impl Crypto for TestCrypto {
+unsafe impl Crypto for TestCrypto {
     type IdentityPrivateKeyHandle = IdentityPrivateKeyHandle;
     type Sha256HashContext = Sha256HashContext;
     type HmacDerivationKeyHandle = HmacDerivationKeyHandle;

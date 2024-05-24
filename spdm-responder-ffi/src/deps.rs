@@ -19,7 +19,7 @@ pub struct HmacDerivationKeyHandle;
 pub struct HmacSecretKeyHandle;
 pub struct AesGcmKeyHandle;
 
-impl Crypto for EalCrypto {
+unsafe impl Crypto for EalCrypto {
     /// Use raw private key for eal's private key handle.
     type IdentityPrivateKeyHandle = IdentityPrivateKey;
     // TODO(b/284404632): Decide some crypto types for eal.

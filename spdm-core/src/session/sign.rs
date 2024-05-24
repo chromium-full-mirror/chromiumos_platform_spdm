@@ -56,6 +56,7 @@ fn make_prefix<'a>(role: SpdmRole, context: &str, buf: Out<'a, [u8]>) -> SpdmRes
 }
 
 /// See [`make_prefix`](`make_prefix`).
+// SAFETY: `buf` is guaranteed to be initialized if `Ok` is returned.
 fn make_message_to_sign<'a, C: Crypto>(
     role: SpdmRole,
     context: &str,
@@ -75,6 +76,7 @@ fn make_message_to_sign<'a, C: Crypto>(
     Ok(C::sha256_final(hash_ctx, buf)?)
 }
 
+// SAFETY: `buf` is guaranteed to be initialized if `Ok` is returned.
 pub fn make_message_to_sign_for_key_exchange<'a, C: Crypto>(
     transcript_hash: &Sha256Hash,
     buf: Out<'a, Sha256Hash>,
@@ -87,6 +89,7 @@ pub fn make_message_to_sign_for_key_exchange<'a, C: Crypto>(
     )
 }
 
+// SAFETY: `buf` is guaranteed to be initialized if `Ok` is returned.
 pub fn make_message_to_sign_for_finish<'a, C: Crypto>(
     transcript_hash: &Sha256Hash,
     buf: Out<'a, Sha256Hash>,

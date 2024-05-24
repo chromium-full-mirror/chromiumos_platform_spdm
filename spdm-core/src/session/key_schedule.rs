@@ -113,6 +113,7 @@ fn gen_bin_str7(buf: &mut BinConcatBuffer) -> SpdmStatus {
     gen_bin_str(SHA256_HASH_SIZE, None, BIN_STR7_LABEL, buf)
 }
 
+// SAFETY: `main_secret` is guaranteed to be initialized if `Ok` is returned.
 pub fn generate_main_secret<'a, C: Crypto>(
     handshake_secret: &C::HmacDerivationKeyHandle,
     main_secret: Out<'a, C::HmacDerivationKeyHandle>,
@@ -152,6 +153,7 @@ impl<C: Crypto> MessageSecrets<C> {
     }
 }
 
+// SAFETY: `message_secrets` is guaranteed to be initialized if `Ok` is returned.
 pub fn generate_message_secrets<'a, C: Crypto>(
     session: &Session<C>,
     phase: SessionPhase,
@@ -186,6 +188,7 @@ pub fn generate_message_secrets<'a, C: Crypto>(
     Ok(unsafe { message_secrets.assume_init() })
 }
 
+// SAFETY: `finished_key` is guaranteed to be initialized if `Ok` is returned.
 pub fn generate_finished_key<'a, C: Crypto>(
     role: SpdmRole,
     message_secrets: &MessageSecrets<C>,
@@ -238,6 +241,7 @@ impl<C: Crypto> AeadSessionKeys<C> {
     }
 }
 
+// SAFETY: `keys` is guaranteed to be initialized if `Ok` is returned.
 pub fn generate_directional_keys<'a, C: Crypto>(
     secret: &C::HmacDerivationKeyHandle,
     mut keys: Out<'a, AeadKeys<C>>,
@@ -261,6 +265,7 @@ fn xor_suffix(iv: &mut AesGcm128Iv, seq_num: SequenceNumber) {
     }
 }
 
+// SAFETY: `aead_keys` is guaranteed to be initialized if `Ok` is returned.
 pub fn generate_aead_keys<'a, C: Crypto>(
     message_secrets: &MessageSecrets<C>,
     sequence_numbers: &SequenceNumbers,
@@ -277,6 +282,7 @@ pub fn generate_aead_keys<'a, C: Crypto>(
     Ok(unsafe { aead_keys.assume_init() })
 }
 
+// SAFETY: `keys` is guaranteed to be initialized if `Ok` is returned.
 pub fn get_session_keys<'a, C: Crypto>(
     session: &Session<C>,
     phase: SessionPhase,
