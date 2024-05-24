@@ -98,7 +98,10 @@ impl<D: ResponderDeps> InternalDispatcher for Responder<D> {
             return Err(ErrorCode::Unspecified);
         };
         let mut session_keys = MaybeUninit::<AeadSessionKeys<D::Crypto>>::uninit();
-        let session_keys = get_session_keys(&self.session, phase, &mut session_keys)?;
+        get_session_keys(&self.session, phase, &mut session_keys)?;
+        // SAFETY: `session_keys` is guaranteed to be initialized after a successful
+        // `get_session_keys`.
+        let session_keys = unsafe { session_keys.assume_init() };
         let req_size =
             decrypt_secure_message(session_id, &session_keys.request_keys, buf, req_size)?;
         self.session.sequence_numbers.request += 1;

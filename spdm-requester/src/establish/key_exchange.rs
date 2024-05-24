@@ -59,9 +59,11 @@ impl<D: RequesterDeps> KeyExchangeSender for Requester<D> {
         let mut private_key =
             MaybeUninit::<<D::Crypto as Crypto>::IdentityPrivateKeyHandle>::uninit();
         let mut public_key = MaybeUninit::<IdentityPublicKey>::uninit();
-        let (private_key, public_key) =
-            D::Crypto::random_key_pair(private_key.as_out(), public_key.as_out())
-                .map_err(|_| RequesterError)?;
+        let (_, public_key) = D::Crypto::random_key_pair(private_key.as_out(), public_key.as_out())
+            .map_err(|_| RequesterError)?;
+        // SAFETY: `private_key` is guaranteed to be initialized after a successful
+        // `random_key_pair`.
+        let private_key = unsafe { private_key.assume_init() };
 
         let request = generate_key_exchange_request::<D::Crypto>(my_half_session_id, public_key)
             .map_err(|_| RequesterError)?;
@@ -88,7 +90,7 @@ impl<D: RequesterDeps> KeyExchangeSender for Requester<D> {
         self.session
             .set_session_id(my_half_session_id, resp.resp_session_id);
         self.session
-            .generate_handshake_secret(&resp.exchange_data, private_key)
+            .generate_handshake_secret(&resp.exchange_data, &private_key)
             .map_err(|_| RequesterError)?;
 
         // Update transcript with KEY_EXCHANGE response, along with verifying the signature/hmac.

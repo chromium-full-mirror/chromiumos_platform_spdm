@@ -97,13 +97,18 @@ impl<C: Crypto> RequesterSession<C> for Session<C> {
 
     fn verify_key_exchange_message_hmac(&mut self, hmac: &Sha256Hash) -> SpdmStatus {
         let mut message_secrets = MaybeUninit::<MessageSecrets<C>>::uninit();
-        let secrets =
-            generate_message_secrets(self, SessionPhase::Handshake, (&mut message_secrets).into())?;
+        generate_message_secrets(self, SessionPhase::Handshake, (&mut message_secrets).into())?;
+        // SAFETY: `message_secrets` is guaranteed to be initialized after a successful
+        // `generate_message_secrets`.
+        let secrets = unsafe { message_secrets.assume_init() };
+
         let th1 = self.th1.as_ref().ok_or(ErrorCode::Unspecified)?;
         let mut finished_key = MaybeUninit::<<C as Crypto>::HmacSecretKeyHandle>::uninit();
-        let finished_key =
-            generate_finished_key(SpdmRole::Responder, secrets, (&mut finished_key).into())?;
-        C::validate_hmac(finished_key, th1, hmac)?;
+        generate_finished_key(SpdmRole::Responder, &secrets, (&mut finished_key).into())?;
+        // SAFETY: `finished_key` is guaranteed to be initialized after a successful
+        // `generate_finished_key`.
+        let finished_key = unsafe { finished_key.assume_init() };
+        C::validate_hmac(&finished_key, th1, hmac)?;
         // Update the transcript after verifying.
         self.extend_transcript_hash_with_key_exchange_hmac(hmac)?;
         Ok(())
@@ -142,16 +147,20 @@ impl<C: Crypto> RequesterSession<C> for Session<C> {
             .ok_or(ErrorCode::Unspecified)?;
 
         let mut message_secrets = MaybeUninit::<MessageSecrets<C>>::uninit();
-        let secrets =
-            generate_message_secrets(self, SessionPhase::Handshake, (&mut message_secrets).into())?;
+        generate_message_secrets(self, SessionPhase::Handshake, (&mut message_secrets).into())?;
+        // SAFETY: `message_secrets` is guaranteed to be initialized after a successful
+        // `generate_message_secrets`.
+        let secrets = unsafe { message_secrets.assume_init() };
 
         let mut transcipt_hash = MaybeUninit::<Sha256Hash>::uninit();
         let transcipt_hash: &_ = C::sha256_get(ctx, (&mut transcipt_hash).into())?;
 
         let mut finished_key = MaybeUninit::<<C as Crypto>::HmacSecretKeyHandle>::uninit();
-        let finished_key =
-            generate_finished_key(SpdmRole::Requester, secrets, (&mut finished_key).into())?;
-        C::hmac(finished_key, transcipt_hash, hmac.into())?;
+        generate_finished_key(SpdmRole::Requester, &secrets, (&mut finished_key).into())?;
+        // SAFETY: `finished_key` is guaranteed to be initialized after a successful
+        // `generate_finished_key`.
+        let finished_key = unsafe { finished_key.assume_init() };
+        C::hmac(&finished_key, transcipt_hash, hmac.into())?;
         self.extend_transcript_hash_with_finish_hmac(hmac)?;
         Ok(())
     }

@@ -123,8 +123,11 @@ pub fn generate_main_secret<'a, C: Crypto>(
 
     let mut salt1: MaybeUninit<<C as Crypto>::HmacDerivationKeyHandle> =
         MaybeUninit::<C::HmacDerivationKeyHandle>::uninit();
-    let salt = C::hmac_expand_derivation_key(handshake_secret, bin_str.as_ref(), salt1.as_out())?;
-    Ok(C::hmac_extract(salt, &ALL_0, main_secret)?)
+    C::hmac_expand_derivation_key(handshake_secret, bin_str.as_ref(), salt1.as_out())?;
+    // SAFETY: `salt1` is guaranteed to be initialized after a successful
+    // `hmac_expand_derivation_key`.
+    let salt = unsafe { salt1.assume_init() };
+    Ok(C::hmac_extract(&salt, &ALL_0, main_secret)?)
 }
 
 pub struct MessageSecrets<C: Crypto> {
@@ -280,8 +283,11 @@ pub fn get_session_keys<'a, C: Crypto>(
     keys: &'a mut MaybeUninit<AeadSessionKeys<C>>,
 ) -> SpdmResult<&'a mut AeadSessionKeys<C>> {
     let mut message_secrets = MaybeUninit::<MessageSecrets<C>>::uninit();
-    let message_secrets = generate_message_secrets(session, phase, (&mut message_secrets).into())?;
-    generate_aead_keys(message_secrets, &session.sequence_numbers, keys.into())
+    generate_message_secrets(session, phase, (&mut message_secrets).into())?;
+    // SAFETY: `message_secrets` is guaranteed to be initialized after a successful
+    // `generate_message_secrets`.
+    let message_secrets = unsafe { message_secrets.assume_init() };
+    generate_aead_keys(&message_secrets, &session.sequence_numbers, keys.into())
 }
 
 #[cfg(test)]

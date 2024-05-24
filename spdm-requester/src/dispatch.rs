@@ -130,8 +130,11 @@ impl<D: RequesterDeps> DispatchSecure for Requester<D> {
             return Err(RequesterError);
         };
         let mut session_keys = MaybeUninit::<AeadSessionKeys<D::Crypto>>::uninit();
-        let session_keys = get_session_keys::<D::Crypto>(&self.session, phase, &mut session_keys)
+        get_session_keys::<D::Crypto>(&self.session, phase, &mut session_keys)
             .map_err(|_| RequesterError)?;
+        // SAFETY: `session_keys` is guaranteed to be initialized after a successful
+        // `get_session_keys`.
+        let session_keys = unsafe { session_keys.assume_init() };
 
         let encrypted_req_size = encrypt_secure_message::<D::Crypto>(
             session_id,

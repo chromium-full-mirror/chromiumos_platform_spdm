@@ -208,11 +208,14 @@ impl Crypto for CryptoImpl {
         &'b mut Self::HmacDerivationKeyHandle,
     )> {
         let mut private = MaybeUninit::<Self::IdentityPrivateKeyHandle>::uninit();
-        let (private, public) = Self::random_key_pair(private.as_out(), my_public_key)?;
+        let (_, public) = Self::random_key_pair(private.as_out(), my_public_key)?;
+        // SAFETY: `private` is guaranteed to be initialized after a successful
+        // `random_key_pair`.
+        let private = unsafe { private.assume_init() };
 
         let hmac_key_handle = Self::hmac_extract_from_ecdh_with_priv(
             their_public_key,
-            private,
+            &private,
             salt,
             hmac_derivation_key_handle,
         )?;
